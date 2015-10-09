@@ -1,0 +1,11 @@
+Document: gimp-collection-grid-maker-help
+Title: GIMP Plug-in Template Help
+Author: John Doe <johndoe@johndoes.net>
+Abstract: Online help for the 
+ GIMP plug-in template.
+Section: Apps/Graphics
+
+Format: HTML
+Index: /usr/share/gimp-collection-grid-maker/help/C/index.html
+Files: /usr/share/gimp-collection-grid-maker/help/C/*.html 
+ /usr/share/gimp-collection-grid-maker/help/images/*
