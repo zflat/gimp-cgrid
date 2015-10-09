@@ -2,14 +2,13 @@
  */
 
 #include "config.h"
-
 #include <string.h>
 
 #include <libgimp/gimp.h>
 #include <libgimp/gimpui.h>
 
 #include "main.h"
-#include "interface.h"
+#include "ui.h"
 #include "render.h"
 
 #include "plugin-intl.h"
@@ -29,37 +28,27 @@
 
 static void   query (void);
 static void   run   (const gchar      *name,
-		     gint              nparams,
-		     const GimpParam  *param,
-		     gint             *nreturn_vals,
-		     GimpParam       **return_vals);
+                     gint              nparams,
+                     const GimpParam  *param,
+                     gint             *nreturn_vals,
+                     GimpParam       **return_vals);
 
 
 /*  Local variables  */
 
 const PlugInVals default_vals =
-{
-  0,
-  1,
-  2,
-  0,
-  FALSE
-};
-
-const PlugInImageVals default_image_vals =
-{
-  0
-};
-
-const PlugInDrawableVals default_drawable_vals =
-{
-  0
-};
+  {
+    0,
+    1,
+    2,
+    0,
+    FALSE
+  };
 
 const PlugInUIVals default_ui_vals =
-{
-  TRUE
-};
+  {
+    TRUE
+  };
 
 static PlugInVals         vals;
 static PlugInImageVals    image_vals;
@@ -68,32 +57,23 @@ static PlugInUIVals       ui_vals;
 
 
 GimpPlugInInfo PLUG_IN_INFO =
-{
-  NULL,  /* init_proc  */
-  NULL,  /* quit_proc  */
-  query, /* query_proc */
-  run,   /* run_proc   */
-};
+  {
+    NULL,  /* init_proc  */
+    NULL,  /* quit_proc  */
+    query, /* query_proc */
+    run,   /* run_proc   */
+  };
 
 MAIN ()
 
-static void
-query (void)
-{
+static void query (void) {
   gchar *help_path;
   gchar *help_uri;
 
   static GimpParamDef args[] =
-  {
-    { GIMP_PDB_INT32,    "run_mode",   "Interactive, non-interactive"    },
-    { GIMP_PDB_IMAGE,    "image",      "Input image"                     },
-    { GIMP_PDB_DRAWABLE, "drawable",   "Input drawable"                  },
-    { GIMP_PDB_INT32,    "dummy",      "dummy1"                          },
-    { GIMP_PDB_INT32,    "dummy",      "dummy2"                          },
-    { GIMP_PDB_INT32,    "dummy",      "dummy3"                          },
-    { GIMP_PDB_INT32,    "seed",       "Seed value (used only if randomize is FALSE)" },
-    { GIMP_PDB_INT32,    "randomize",  "Use a random seed (TRUE, FALSE)" }
-  };
+    {
+      { GIMP_PDB_INT32,    "run_mode",   "Interactive, non-interactive"    },
+    };
 
   gimp_plugin_domain_register (GETTEXT_PACKAGE, LOCALEDIR);
 
@@ -107,18 +87,18 @@ query (void)
   g_free (help_uri);
 
   gimp_install_procedure (PROCEDURE_NAME,
-			  "Blurb",
-			  "Help",
-			  "Michael Natterer <mitch@gimp.org>",
-			  "Michael Natterer <mitch@gimp.org>",
-			  "2000-2004",
-			  N_("Plug-In Template..."),
-			  "RGB*, GRAY*, INDEXED*",
-			  GIMP_PLUGIN,
-			  G_N_ELEMENTS (args), 0,
-			  args, NULL);
+                          "Arrange a collection of images in a grid or strip",
+                          "William Wedler",
+                          "William Wedler",
+                          "wwedler.com",
+                          "2015",
+                          N_("Collection Grid Maker..."),
+                          "",
+                          GIMP_PLUGIN,
+                          G_N_ELEMENTS (args), 0,
+                          args, NULL);
 
-  gimp_plugin_menu_register (PROCEDURE_NAME, "<Image>/Filters/Misc");
+  gimp_plugin_menu_register (PROCEDURE_NAME, "<Image>/File/Open");
 }
 
 static void
@@ -126,8 +106,7 @@ run (const gchar      *name,
      gint              n_params,
      const GimpParam  *param,
      gint             *nreturn_vals,
-     GimpParam       **return_vals)
-{
+     GimpParam       **return_vals) {
   static GimpParam   values[1];
   GimpDrawable      *drawable;
   gint32             image_ID;
@@ -145,81 +124,54 @@ run (const gchar      *name,
   textdomain (GETTEXT_PACKAGE);
 
   run_mode = param[0].data.d_int32;
-  image_ID = param[1].data.d_int32;
-  drawable = gimp_drawable_get (param[2].data.d_drawable);
 
   /*  Initialize with default values  */
   vals          = default_vals;
-  image_vals    = default_image_vals;
-  drawable_vals = default_drawable_vals;
   ui_vals       = default_ui_vals;
 
-  if (strcmp (name, PROCEDURE_NAME) == 0)
-    {
-      switch (run_mode)
-	{
-	case GIMP_RUN_NONINTERACTIVE:
-	  if (n_params != 8)
-	    {
-	      status = GIMP_PDB_CALLING_ERROR;
-	    }
-	  else
-	    {
-	      vals.dummy1      = param[3].data.d_int32;
-	      vals.dummy2      = param[4].data.d_int32;
-	      vals.dummy3      = param[5].data.d_int32;
-	      vals.seed        = param[6].data.d_int32;
-	      vals.random_seed = param[7].data.d_int32;
+  if (strcmp (name, PROCEDURE_NAME) == 0) {
+    switch (run_mode)	{
+    case GIMP_RUN_NONINTERACTIVE:
+      break;
 
-              if (vals.random_seed)
-                vals.seed = g_random_int ();
-	    }
-	  break;
+    case GIMP_RUN_INTERACTIVE:
+      /*  Possibly retrieve data  */
+      gimp_get_data (DATA_KEY_VALS,    &vals);
+      gimp_get_data (DATA_KEY_UI_VALS, &ui_vals);
 
-	case GIMP_RUN_INTERACTIVE:
-	  /*  Possibly retrieve data  */
-	  gimp_get_data (DATA_KEY_VALS,    &vals);
-	  gimp_get_data (DATA_KEY_UI_VALS, &ui_vals);
-
-	  if (! dialog (image_ID, drawable,
-			&vals, &image_vals, &drawable_vals, &ui_vals))
-	    {
+      if (! dialog (&vals, &ui_vals)) {
 	      status = GIMP_PDB_CANCEL;
 	    }
-	  break;
+      break;
 
-	case GIMP_RUN_WITH_LAST_VALS:
-	  /*  Possibly retrieve data  */
-	  gimp_get_data (DATA_KEY_VALS, &vals);
+    case GIMP_RUN_WITH_LAST_VALS:
+      /*  Possibly retrieve data  */
+      gimp_get_data (DATA_KEY_VALS, &vals);
 
-          if (vals.random_seed)
-            vals.seed = g_random_int ();
-	  break;
+      if (vals.random_seed)
+        vals.seed = g_random_int ();
+      break;
 
-	default:
-	  break;
-	}
+    default:
+      break;
     }
-  else
-    {
-      status = GIMP_PDB_CALLING_ERROR;
+  } else {
+    status = GIMP_PDB_CALLING_ERROR;
+  }
+
+  if (status == GIMP_PDB_SUCCESS) {
+    render (NULL, NULL, &vals, NULL, NULL);
+
+    if (run_mode != GIMP_RUN_NONINTERACTIVE)
+      gimp_displays_flush ();
+
+    if (run_mode == GIMP_RUN_INTERACTIVE) {
+      gimp_set_data (DATA_KEY_VALS,    &vals,    sizeof (vals));
+      gimp_set_data (DATA_KEY_UI_VALS, &ui_vals, sizeof (ui_vals));
     }
 
-  if (status == GIMP_PDB_SUCCESS)
-    {
-      render (image_ID, drawable, &vals, &image_vals, &drawable_vals);
-
-      if (run_mode != GIMP_RUN_NONINTERACTIVE)
-	gimp_displays_flush ();
-
-      if (run_mode == GIMP_RUN_INTERACTIVE)
-	{
-	  gimp_set_data (DATA_KEY_VALS,    &vals,    sizeof (vals));
-	  gimp_set_data (DATA_KEY_UI_VALS, &ui_vals, sizeof (ui_vals));
-	}
-
-      gimp_drawable_detach (drawable);
-    }
+    gimp_drawable_detach (drawable);
+  }
 
   values[0].type = GIMP_PDB_STATUS;
   values[0].data.d_status = status;

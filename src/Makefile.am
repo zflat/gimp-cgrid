@@ -6,8 +6,8 @@ bindir = $(GIMP_LIBDIR)/plug-ins
 
 gimp_collection_grid_maker_SOURCES = \
 	plugin-intl.h	\
-	interface.c	\
-	interface.h	\
+	ui.c	\
+	ui.h	\
 	main.c		\
 	main.h		\
 	render.c	\
