@@ -87,7 +87,7 @@ static void query (void) {
   g_free (help_uri);
 
   gimp_install_procedure (PROCEDURE_NAME,
-                          "Arrange a collection of images in a grid or strip",
+                          PLUG_IN_DESCRIPTION,
                           "William Wedler",
                           "William Wedler",
                           "wwedler.com",

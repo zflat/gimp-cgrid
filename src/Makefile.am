@@ -5,6 +5,8 @@ bin_PROGRAMS = gimp-collection-grid-maker
 bindir = $(GIMP_LIBDIR)/plug-ins
 
 gimp_collection_grid_maker_SOURCES = \
+	cgrid_utils.h	\
+	cgrid_utils.c	\
 	plugin-intl.h	\
 	ui.c	\
 	ui.h	\
