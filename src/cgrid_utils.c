@@ -225,3 +225,7 @@ int set_modification_time(char* filename, time_t mtime) {
     }
     else return 0;
 }
+
+gint compute_n_rows(gint total_elems, gint n_cols) {
+  return CEILING_POS((gfloat)total_elems/n_cols);
+}

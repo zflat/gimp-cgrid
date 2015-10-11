@@ -8,13 +8,31 @@
 #define PLUGIN_RESULT_WARNING 0
 #define PLUGIN_RESULT_ERROR -1
 
+typedef struct{
+  gint32 layer_ID;
+  gint32 mat_layer_ID; // for the border
+  gint32 group_ID;
+  gint   position_n;
+} InputNode;
+
 typedef struct
 {
-  gint      dummy1;
-  gint      dummy2;
-  gint      dummy3;
-  guint     seed;
+  GSList   *input_filenames; // list of image file names & position in the grid
+  gint     n_cols; // number of images wide to make the grid
+  gint     n_rows; // number of images tall to make the grid
+  gint     col_width; // width of one column
+  gint     row_height;// height of one row
+  gint     output_width; // output image widht
+  gint     output_height;// outout image height
+  gint     margin_x; // horizonal margin between images
+  gint     margin_y; // vertical margin between images
+  gint     border_width;
+  gint     seed;
   gboolean  random_seed;
+  gint32    image_ID;
+  GSList   *input_nodes; // list of layer ids & position in the grid
+  gint      max_input_x; // input image max width
+  gint      max_input_y; // input image max height
 } PlugInVals;
 
 typedef struct

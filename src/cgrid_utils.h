@@ -27,7 +27,12 @@ int set_modification_time(char*, time_t);
 #define FILE_SEPARATOR_STR "/"
 #endif
 
-#define min(a,b) (a < b ? a : b)
-#define max(a,b) (a > b ? a : b)
+#define MIN(a,b) (a < b ? a : b)
+#define MAX(a,b) (a > b ? a : b)
+
+#define CEILING_POS(X) ((X-(int)(X)) > 0 ? (int)(X+1) : (int)(X))
+#define FLOOR_POS(X) ((int)(X))
+
+gint compute_n_rows(gint total_elems, gint n_cols);
 
 #endif

@@ -10,6 +10,7 @@
 #include "main.h"
 #include "ui.h"
 #include "render.h"
+#include "maker.h"
 
 #include "plugin-intl.h"
 
@@ -38,11 +39,22 @@ static void   run   (const gchar      *name,
 
 const PlugInVals default_vals =
   {
-    0,
-    1,
-    2,
-    0,
-    FALSE
+    NULL,
+    1, // n_cols
+    0, // n_rows
+    0, // col_width
+    0, // row_height
+    1, // output image width
+    1, // output image height
+    20, // margin_x
+    20, // margin_y
+    0,  // border_width
+    0, 
+    FALSE,
+    0, // image ID
+    NULL, // list 
+    0, // max x 
+    0  // max y
   };
 
 const PlugInUIVals default_ui_vals =
@@ -139,11 +151,16 @@ run (const gchar      *name,
       gimp_get_data (DATA_KEY_VALS,    &vals);
       gimp_get_data (DATA_KEY_UI_VALS, &ui_vals);
 
-      if (! dialog (&vals, &ui_vals)) {
+      if ( !dialog (&vals, &ui_vals)) {
 	      status = GIMP_PDB_CANCEL;
-	    }
-      break;
+        break;
+	    } 
+      
+      if( !build_image_grid(&vals)  ) {
+        break;
+      }
 
+      break;
     case GIMP_RUN_WITH_LAST_VALS:
       /*  Possibly retrieve data  */
       gimp_get_data (DATA_KEY_VALS, &vals);
@@ -169,8 +186,9 @@ run (const gchar      *name,
       gimp_set_data (DATA_KEY_VALS,    &vals,    sizeof (vals));
       gimp_set_data (DATA_KEY_UI_VALS, &ui_vals, sizeof (ui_vals));
     }
-
-    gimp_drawable_detach (drawable);
+    if(NULL != drawable) {
+      gimp_drawable_detach (drawable);
+    }
   }
 
   values[0].type = GIMP_PDB_STATUS;

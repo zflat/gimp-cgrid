@@ -43,12 +43,14 @@ static void init_fileview();
 static void add_to_fileview(char *str);
 static void refresh_fileview();
 
-static const gchar* progressbar_init_hidden ();
+/*static const gchar* progressbar_init_hidden ();
 static void progressbar_start_hidden (const gchar *message, gboolean cancelable, gpointer user_data);
 static void progressbar_end_hidden (gpointer user_data);
 static void progressbar_settext_hidden (const gchar *message, gpointer user_data);
 static void progressbar_setvalue_hidden (double percent, gpointer user_data);
 static void cgrid_progress_bar_set(double fraction, char* text);
+*/
+
 static void cgrid_set_busy(gboolean busy);
 
 void cgrid_show_error_dialog(char* message, GtkWidget* parent);
@@ -61,14 +63,14 @@ static PlugInUIVals *ui_state = NULL;
 GtkWidget *panel_options;
 GtkWidget *popmenu_add, *popmenu_edit, *popmenu_addfiles, *popmenu_removefiles;
 GtkWidget *treeview_files;
-GtkWidget* progressbar_visible;
+//GtkWidget* progressbar_visible;
 enum /* TreeView stuff... */
 {
   LIST_ITEM = 0,
   N_COLUMNS
 };
 
-const gchar* progressbar_data;
+//const gchar* progressbar_data;
 
 /*  Public functions  */
 
@@ -105,13 +107,15 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
   vbox_main = gtk_vbox_new(FALSE, 10);
   panel_options = option_panel_new();
   popmenus_init();
-    
+  
+  /*  
   progressbar_visible = gtk_progress_bar_new();
   gtk_widget_set_size_request (progressbar_visible, PROGRESSBAR_W, PROGRESSBAR_H);
   progressbar_data = progressbar_init_hidden();
+  */
     
   gtk_box_pack_start(GTK_BOX(vbox_main), panel_options, FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(vbox_main), progressbar_visible, FALSE, FALSE, 0);
+  //gtk_box_pack_start(GTK_BOX(vbox_main), progressbar_visible, FALSE, FALSE, 0);
 
   gtk_container_add (GTK_CONTAINER (GTK_DIALOG(cgrid_window_main)->vbox), vbox_main);
   gtk_widget_show_all(cgrid_window_main);
@@ -121,15 +125,17 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
   
   while(TRUE) {
         gint run = gimp_dialog_run (GIMP_DIALOG(cgrid_window_main));
-        if (run == GTK_RESPONSE_APPLY) {
-          g_print(g_slist_length(cgrid_input_filenames));
+        if (run == GTK_RESPONSE_OK) {
           if (g_slist_length(cgrid_input_filenames) == 0) {
             cgrid_show_error_dialog(_("The file list is empty!"), cgrid_window_main);
           }
           else {
             /* Set options */
+            vals->input_filenames = cgrid_input_filenames;
+            //g_printf("processing files...\n\a");
+            vals->input_nodes = NULL;
+            return TRUE;
           }
-            
         }
         else if (run == GTK_RESPONSE_HELP) {
           /* open_about();*/ 
@@ -138,7 +144,7 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
             cgrid_set_busy(FALSE);
         }
         else {
-            gimp_progress_uninstall(progressbar_data);
+          //gimp_progress_uninstall(progressbar_data);
             gtk_widget_destroy (cgrid_window_main);
             return TRUE;
         }
@@ -171,12 +177,15 @@ gboolean dialog0 (PlugInVals *vals, PlugInUIVals *ui_vals) {
   vbox_main = gtk_vbox_new (FALSE, 12);
 
   panel_options = option_panel_new();
+
+  /*
   progressbar_visible = gtk_progress_bar_new();
   gtk_widget_set_size_request (progressbar_visible, PROGRESSBAR_W, PROGRESSBAR_H);
   progressbar_data = progressbar_init_hidden();
+  */
 
   gtk_box_pack_start(GTK_BOX(vbox_main), panel_options, FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(vbox_main), progressbar_visible, FALSE, FALSE, 0);
+  //gtk_box_pack_start(GTK_BOX(vbox_main), progressbar_visible, FALSE, FALSE, 0);
 
   gtk_container_set_border_width (GTK_CONTAINER (vbox_main), 12);
   gtk_container_add (GTK_CONTAINER (GTK_DIALOG (dlg)->vbox), vbox_main);
@@ -307,7 +316,7 @@ static void add_input_folder_r(char* folder, gboolean with_subdirs)
     dp = g_dir_open (folder, 0, NULL);
     
     if (dp != NULL) {
-        while (entry = g_dir_read_name (dp)) {            
+      while ((entry = g_dir_read_name (dp))) {            
             
             char* filename = g_strconcat(folder, FILE_SEPARATOR_STR, entry, NULL);
             char* file_extension = g_strdup(strrchr(filename, '.'));
@@ -387,7 +396,7 @@ static void remove_input_file(GtkWidget *widget, gpointer data)
     
     if (selection != NULL) {
         for (i = selection; i != NULL; i = g_slist_next(i) ) {
-            cgrid_input_filenames = g_slist_delete_link(cgrid_input_filenames, g_slist_find_custom(cgrid_input_filenames, (char*)(i->data), (GCompareFunc)strcmp));
+          cgrid_input_filenames = g_slist_delete_link(cgrid_input_filenames, g_slist_find_custom(cgrid_input_filenames, (char*)(i->data), (GCompareFunc)strcmp));
         }
         
         refresh_fileview();
@@ -677,6 +686,7 @@ void cgrid_show_error_dialog(char* message, GtkWidget* parent)
 
 
 /* suppress progress popup by installing progress handlers that do nothing */
+/*
 static const gchar* progressbar_init_hidden ()
 {    
     GimpProgressVtable vtable = { 0, };
@@ -701,7 +711,7 @@ void cgrid_progress_bar_set(double fraction, char* text) {
         gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar_visible), text);
     }
 }
-
+*/
 
 void cgrid_set_busy(gboolean busy) {
     GList *actions_children, *tmp_child;

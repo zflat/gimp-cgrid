@@ -11,6 +11,8 @@ gimp_collection_grid_maker_SOURCES = \
 	ui.c	\
 	ui.h	\
 	main.c		\
+	maker.h		\
+	maker.c		\
 	main.h		\
 	render.c	\
 	render.h
