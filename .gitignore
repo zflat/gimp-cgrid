@@ -29,7 +29,6 @@ src/.deps/
 src/Makefile
 src/Makefile.in
 src/gimp-collection-grid-maker
-src/ui.o
-src/main.o
-src/render.o
+src/*.o
 stamp-h1
+TAGS
