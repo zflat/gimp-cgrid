@@ -222,18 +222,16 @@ static gboolean dialog_image_constraint_func (gint32 image_id, gpointer  data) {
 
 /* builds and returns the panel with file list and options */
 static GtkWidget* option_panel_new() {
-    GtkWidget *panel, *hbox;
+    GtkWidget *panel;
     GtkWidget *hbox_buttons;
     GtkWidget *vbox_input;
     GtkWidget *scroll_input;
     GtkWidget *button_add, *button_remove;
     
-    GtkWidget *vbox_useroptions, *hbox_outfolder;
     GtkWidget *label_chooser;
     
     panel = gtk_frame_new(_("Input files and options"));
     gtk_widget_set_size_request (panel, OPTION_PANEL_W, OPTION_PANEL_H);
-    hbox = gtk_hbox_new(FALSE, 5);
     
     /* Sub-panel for input file listing and buttons */
     vbox_input = gtk_vbox_new(FALSE, 1);
@@ -258,13 +256,6 @@ static GtkWidget* option_panel_new() {
     button_remove = gtk_button_new_with_label(_("Remove images"));
     gtk_widget_set_size_request(button_remove, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
     
-    /* Sub-panel for options */
-    vbox_useroptions = gtk_vbox_new(FALSE, 3);
-    gtk_widget_set_size_request(vbox_useroptions, USEROPTIONS_PANEL_W, USEROPTIONS_PANEL_H);
-    
-    hbox_outfolder = gtk_hbox_new(FALSE, 3);
-    label_chooser = gtk_label_new(_("Output folder"));
-    
     
     /* All together */
     gtk_box_pack_start(GTK_BOX(hbox_buttons), button_add, FALSE, FALSE, 0);
@@ -275,13 +266,7 @@ static GtkWidget* option_panel_new() {
     gtk_box_pack_start(GTK_BOX(vbox_input), scroll_input, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(vbox_input), hbox_buttons, FALSE, FALSE, 0);
     
-   
-    gtk_box_pack_start(GTK_BOX(vbox_useroptions), hbox_outfolder, FALSE, FALSE, 0);
-    
-    gtk_box_pack_start(GTK_BOX(hbox), vbox_input, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(hbox), vbox_useroptions, FALSE, FALSE, 10);
-    
-    gtk_container_add(GTK_CONTAINER(panel), hbox);
+    gtk_container_add(GTK_CONTAINER(panel), vbox_input);
 
     g_signal_connect(G_OBJECT(button_add), "clicked", G_CALLBACK(open_addfiles_popupmenu), NULL);
     g_signal_connect(G_OBJECT(button_remove), "clicked", G_CALLBACK(open_removefiles_popupmenu), NULL);
@@ -298,8 +283,7 @@ static GtkWidget* option_panel_new() {
 
 /* following: functions that modify the file list widget (addfile/addfolder/remove/removeall)  */
 
-static void add_input_file(char* filename) 
-{
+static void add_input_file(char* filename) {
     if (g_slist_find_custom(cgrid_input_filenames, filename, (GCompareFunc)strcmp) == NULL) {
         cgrid_input_filenames = g_slist_append(cgrid_input_filenames, filename);
         refresh_fileview();
@@ -307,8 +291,7 @@ static void add_input_file(char* filename)
 }
 
 /* Recursive function to add all files from the hierarchy if desired */
-static void add_input_folder_r(char* folder, gboolean with_subdirs) 
-{
+static void add_input_folder_r(char* folder, gboolean with_subdirs) {
     GDir *dp;
     const gchar* entry;
     dp = g_dir_open (folder, 0, NULL);
@@ -354,16 +337,14 @@ static void add_input_folder_r(char* folder, gboolean with_subdirs)
 }
 
 
-static void add_input_folder(char* folder, gpointer with_subdirs) 
-{
+static void add_input_folder(char* folder, gpointer with_subdirs) {
     add_input_folder_r(folder, (gboolean)GPOINTER_TO_INT(with_subdirs));
     refresh_fileview();
 }
 
 
 /* returns the list of currently selected filenames (NULL of none) */
-static GSList* get_treeview_selection() 
-{
+static GSList* get_treeview_selection() {
     GtkTreeModel *model;
     GList *selected_rows = gtk_tree_selection_get_selected_rows(gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview_files)), &model);
     GList *i = NULL;
@@ -387,8 +368,7 @@ static GSList* get_treeview_selection()
 }
 
 
-static void remove_input_file(GtkWidget *widget, gpointer data) 
-{
+static void remove_input_file(GtkWidget *widget, gpointer data) {
     GSList *selection = get_treeview_selection();
     GSList *i;
     
@@ -402,8 +382,7 @@ static void remove_input_file(GtkWidget *widget, gpointer data)
     }
 }
 
-static void remove_all_input_files(GtkWidget *widget, gpointer data) 
-{
+static void remove_all_input_files(GtkWidget *widget, gpointer data) {
     g_slist_free(cgrid_input_filenames);
     cgrid_input_filenames = NULL;
     refresh_fileview();
