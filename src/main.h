@@ -30,7 +30,7 @@ typedef struct
   gint     seed;
   gboolean  random_seed;
   gint32    image_ID;
-  GSList   *input_nodes; // list of layer ids & position in the grid
+  GSList   *input_nodes; // list of InputNode layer ids & position in the grid
   gint      max_input_x; // input image max width
   gint      max_input_y; // input image max height
 } PlugInVals;
@@ -69,5 +69,7 @@ extern const PlugInUIVals       default_ui_vals;
 
 GSList *cgrid_input_filenames;
 gboolean plugin_is_busy;
+
+gboolean cleanupInputNode(InputNode *node);
 
 #endif /* __MAIN_H__ */

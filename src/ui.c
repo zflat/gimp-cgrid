@@ -89,9 +89,8 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
                     NULL,
                     NULL,
                     GTK_STOCK_ABOUT, GTK_RESPONSE_HELP,
-                    GTK_STOCK_CLOSE, GTK_RESPONSE_CLOSE,
                     GTK_STOCK_OK,     GTK_RESPONSE_OK,
-                    GTK_STOCK_STOP, GTK_RESPONSE_CANCEL, NULL
+                    GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, NULL
                     );
     
   gimp_window_set_transient (GTK_WINDOW(cgrid_window_main));
@@ -123,6 +122,7 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
     
   cgrid_set_busy(FALSE);
   
+  gboolean retval=TRUE;
   while(TRUE) {
         gint run = gimp_dialog_run (GIMP_DIALOG(cgrid_window_main));
         if (run == GTK_RESPONSE_OK) {
@@ -134,22 +134,20 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
             vals->input_filenames = cgrid_input_filenames;
             //g_printf("processing files...\n\a");
             vals->input_nodes = NULL;
-            return TRUE;
+            retval = TRUE;
+            break;
           }
         }
         else if (run == GTK_RESPONSE_HELP) {
           /* open_about();*/ 
         }
         else if (run == GTK_RESPONSE_CANCEL) {
-            cgrid_set_busy(FALSE);
-        }
-        else {
-          //gimp_progress_uninstall(progressbar_data);
-            gtk_widget_destroy (cgrid_window_main);
-            return TRUE;
+            retval = FALSE;
+            break;
         }
     }
-
+  gtk_widget_destroy (cgrid_window_main);
+  return retval;
 }
 
 

@@ -151,11 +151,11 @@ run (const gchar      *name,
       gimp_get_data (DATA_KEY_VALS,    &vals);
       gimp_get_data (DATA_KEY_UI_VALS, &ui_vals);
 
-      if ( !dialog (&vals, &ui_vals)) {
+      if ( !dialog(&vals, &ui_vals) ) {
 	      status = GIMP_PDB_CANCEL;
         break;
 	    } 
-      
+
       if( !build_image_grid(&vals)  ) {
         break;
       }
@@ -189,8 +189,18 @@ run (const gchar      *name,
     if(NULL != drawable) {
       gimp_drawable_detach (drawable);
     }
-  }
 
+    // cleanup vals
+    g_slist_free_full(vals.input_nodes, cleanupInputNode);
+    g_slist_free(vals.input_filenames);
+
+  }
   values[0].type = GIMP_PDB_STATUS;
   values[0].data.d_status = status;
+}
+
+gboolean cleanupInputNode(InputNode *node) {
+  if(node) {
+    free(node);
+  }
 }

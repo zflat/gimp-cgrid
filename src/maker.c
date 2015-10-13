@@ -15,7 +15,7 @@
 
 /*  Public functions  */
 
-gboolean   build_image_grid (PlugInVals *vals){
+gboolean   build_image_grid (PlugInVals *vals) {
   gint32 new_image_display;
 
   g_printf("Selected %d images.\n", g_slist_length(vals->input_filenames));
