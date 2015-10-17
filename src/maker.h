@@ -37,8 +37,9 @@ gboolean compute_image_size(PlugInVals *vals);
 
 /**
  * Compute the x,y location for the given position number
- * and the number of rows and cols
+ * and the number of rows and cols and width & height of 
+ * the image
  */
-gboolean compute_location(gint position_num, PlugInVals *vals, gint *x_location, gint *y_location);
+gboolean compute_location(gint position_num, PlugInVals *vals, gint im_width, gint im_height, gint *x_location, gint *y_location);
 
 #endif /* __MAKER_H__ */

@@ -42,23 +42,32 @@ gboolean   build_image_grid (PlugInVals *vals) {
   new_image_display = gimp_display_new(vals->image_ID);
 }
 
-gboolean compute_location(gint position_num, PlugInVals *vals, gint *x_location, gint *y_location) {
+gboolean compute_location(gint position_num, PlugInVals *vals, gint im_width, gint im_height, gint *x_location, gint *y_location) {
   gint row_num = FLOOR_POS(position_num / vals->n_cols);
   gint col_num = (position_num) % vals->n_cols;
 
+  gint diff_x = vals->max_input_x - im_width;
+  gint diff_y = vals->max_input_y - im_height;
+
   g_printf("position: %d, row=%d col=%d \n",position_num, row_num, col_num);
   
-  *x_location = vals->gutter_x + col_num * vals->col_width;
-  *y_location = vals->gutter_y + row_num * vals->row_height;
+  *x_location = vals->gutter_x + col_num * vals->col_width + diff_x/2;
+  *y_location = vals->gutter_y + row_num * vals->row_height + diff_y/2;
 }
 
 gboolean place_layer_action(InputNode *node,  PlugInVals *vals) {
+  gint im_width;
+  gint im_height;
+  gint x_location;
+  gint y_location;
+
+  im_width = gimp_drawable_width(node->layer_ID);
+  im_height = gimp_drawable_height(node->layer_ID);
+
   gimp_image_insert_layer(vals->image_ID, node->layer_ID, 0, -1);
 
   // compute the x,y position
-  gint x_location;
-  gint y_location;
-  compute_location(node->position_n, vals, &x_location, &y_location);
+  compute_location(node->position_n, vals, im_width, im_height, &x_location, &y_location);
 
   g_print("placing image %d at (%d, %d)\n", node->position_n, x_location, y_location);
   
