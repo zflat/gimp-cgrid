@@ -63,9 +63,10 @@ static PlugInUIVals *ui_state = NULL;
 GtkWidget *panel_options;
 GtkWidget *popmenu_add, *popmenu_edit, *popmenu_addfiles, *popmenu_removefiles;
 GtkWidget *treeview_files;
+GtkWidget *margins;
 GtkWidget *lbl_files_info;
 char *n_files_text = NULL;
-GtkWidget * adj_n_cols;
+GtkWidget* adj_n_cols;
 
 //GtkWidget* progressbar_visible;
 enum /* TreeView stuff... */
@@ -141,7 +142,18 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
           else {
             /* Set options */
             vals->input_filenames = cgrid_input_filenames;
-            //g_printf("processing files...\n\a");
+            vals->n_cols = gtk_adjustment_get_value(adj_n_cols);
+
+            vals->margin_x = gimp_units_to_pixels(gimp_size_entry_get_value(margins, 0), // value
+                                                  gimp_size_entry_get_unit(margins), //unit
+                                                  300// resolution
+                                                  );
+            vals->margin_y = gimp_units_to_pixels(gimp_size_entry_get_value(margins, 1), // value
+                                                  gimp_size_entry_get_unit(margins), //unit
+                                                  300// resolution
+                                                  );
+
+            g_printf("processing files...\n\a");
             vals->input_nodes = NULL;
             retval = TRUE;
             break;
@@ -158,69 +170,6 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
   gtk_widget_destroy (cgrid_window_main);
   return retval;
 }
-
-
-gboolean dialog0 (PlugInVals *vals, PlugInUIVals *ui_vals) {
-  GtkWidget *dlg;
-  GtkWidget *vbox_main;
-  GtkWidget *frame;
-  GtkWidget *coordinates;
-  GtkWidget *combo;
-  gboolean   run = FALSE;
-  GimpUnit   unit;
-
-  ui_state = ui_vals;
-  gimp_ui_init (PLUGIN_NAME, TRUE);
-
-  dlg = gimp_dialog_new (_("GIMP Collection Grid Maker"), PLUGIN_NAME,
-                         NULL, 0,
-			 gimp_standard_help_func, "collection-grid-maker",
-
-			 GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-			 GTK_STOCK_OK,     GTK_RESPONSE_OK,
-
-			 NULL);
-
-  vbox_main = gtk_vbox_new (FALSE, 12);
-
-  panel_options = option_panel_new();
-
-  /*
-  progressbar_visible = gtk_progress_bar_new();
-  gtk_widget_set_size_request (progressbar_visible, PROGRESSBAR_W, PROGRESSBAR_H);
-  progressbar_data = progressbar_init_hidden();
-  */
-
-  gtk_box_pack_start(GTK_BOX(vbox_main), panel_options, FALSE, FALSE, 0);
-  //gtk_box_pack_start(GTK_BOX(vbox_main), progressbar_visible, FALSE, FALSE, 0);
-
-  gtk_container_set_border_width (GTK_CONTAINER (vbox_main), 12);
-  gtk_container_add (GTK_CONTAINER (GTK_DIALOG (dlg)->vbox), vbox_main);
-
-  /*  gimp_scale_entry_new() examples  */
-
-  frame = gimp_frame_new (_("ScaleEntry Examples"));
-  gtk_box_pack_start (GTK_BOX (vbox_main), frame, FALSE, FALSE, 0);
-  gtk_widget_show (frame);
-
-  /*  Show the main containers  */
-
-  gtk_widget_show (vbox_main);
-  gtk_widget_show (dlg);
-
-  run = (gimp_dialog_run (GIMP_DIALOG (dlg)) == GTK_RESPONSE_OK);
-
-  if (run) {
-      /*  Save ui values  */
-      ui_state->chain_active =
-        gimp_chain_button_get_active (GIMP_COORDINATES_CHAINBUTTON (coordinates));
-  }
-
-  gtk_widget_destroy (dlg);
-
-  return run;
-}
-
 
 /*  Private functions  */
 static gboolean dialog_image_constraint_func (gint32 image_id, gpointer  data) {
@@ -313,7 +262,7 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
                             0.5, 0);
 
   //chain_gutter = gimp_chain_button_new(GIMP_CHAIN_RIGHT);
-  GtkWidget *margins = gimp_coordinates_new(GIMP_UNIT_PIXEL,
+  margins = gimp_coordinates_new(GIMP_UNIT_PIXEL,
                                             "%s",
                                             TRUE,
                                             FALSE,

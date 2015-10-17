@@ -20,8 +20,10 @@ gboolean   build_image_grid (PlugInVals *vals) {
 
   g_printf("Selected %d images.\n", g_slist_length(vals->input_filenames));
   g_printf("first filename: %s\n", vals->input_filenames->data);
+  g_printf("gutter x: %d\n", vals->margin_x);
+  g_printf("gutter y: %d\n", vals->margin_y);
 
-  vals->image_ID = gimp_image_new((gint)vals->margin_x, (gint)vals->margin_y, GIMP_RGB);
+  vals->image_ID = gimp_image_new(MAX((gint)vals->margin_x, 1), MAX((gint)vals->margin_y, 1), GIMP_RGB);
 
   if(vals->image_ID <= 0) {
     return FALSE;
@@ -42,9 +44,9 @@ gboolean   build_image_grid (PlugInVals *vals) {
 
 gboolean compute_location(gint position_num, PlugInVals *vals, gint *x_location, gint *y_location) {
   gint row_num = FLOOR_POS(position_num / vals->n_cols);
-  gint col_num = (position_num - 1) % vals->n_cols;
+  gint col_num = (position_num) % vals->n_cols;
 
-  g_printf("row=%d col=%d \n", row_num, col_num);
+  g_printf("position: %d, row=%d col=%d \n",position_num, row_num, col_num);
   
   *x_location = vals->margin_x + col_num * vals->col_width;
   *y_location = vals->margin_y + row_num * vals->row_height;
@@ -106,7 +108,6 @@ gboolean load_input_layer_action(gchar *input_filename,  PlugInVals *vals) {
   InputNode *node = calloc(1, sizeof(InputNode));
   node->layer_ID = layer_ID;
   node->position_n = g_slist_length(vals->input_nodes);
-  
   vals->input_nodes = g_slist_append(vals->input_nodes, node);
   g_print("%d number of nodes\n", g_slist_length(vals->input_nodes));
 
