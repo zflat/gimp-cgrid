@@ -63,6 +63,10 @@ static PlugInUIVals *ui_state = NULL;
 GtkWidget *panel_options;
 GtkWidget *popmenu_add, *popmenu_edit, *popmenu_addfiles, *popmenu_removefiles;
 GtkWidget *treeview_files;
+GtkWidget *lbl_files_info;
+char *n_files_text = NULL;
+GtkWidget * adj_n_cols;
+
 //GtkWidget* progressbar_visible;
 enum /* TreeView stuff... */
 {
@@ -104,7 +108,7 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
   g_object_set(default_settings, "gtk-button-images", TRUE, NULL);
     
   vbox_main = gtk_vbox_new(FALSE, 10);
-  panel_options = option_panel_new();
+  panel_options = option_panel_new(vals);
   popmenus_init();
   
   /*  
@@ -119,6 +123,11 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
   gtk_container_add (GTK_CONTAINER (GTK_DIALOG(cgrid_window_main)->vbox), vbox_main);
   gtk_widget_show_all(cgrid_window_main);
   //gtk_widget_hide(button_preview);
+
+  /* initalize values */
+  
+  //gtk_entry_set_text(entry_gutter_x, vals->margin_x);
+  //gtk_entry_set_text(entry_gutter_x, vals->margin_y);
     
   cgrid_set_busy(FALSE);
   
@@ -218,64 +227,207 @@ static gboolean dialog_image_constraint_func (gint32 image_id, gpointer  data) {
   return (gimp_image_base_type (image_id) == GIMP_RGB);
 }
 
+static void toggle_add_mask(GtkWidget *widget, gpointer data) {
+    if (GTK_TOGGLE_BUTTON (widget)->active) {
+        /* If control reaches here, the toggle button is down */
+      gtk_widget_set_sensitive(data, TRUE);
+    } else {
+        /* If control reaches here, the toggle button is up */
+      gtk_widget_set_sensitive(data, FALSE);
+    }
+}
 
 
 /* builds and returns the panel with file list and options */
-static GtkWidget* option_panel_new() {
-    GtkWidget *panel;
-    GtkWidget *hbox_buttons;
-    GtkWidget *vbox_input;
-    GtkWidget *scroll_input;
-    GtkWidget *button_add, *button_remove;
-    
-    GtkWidget *label_chooser;
-    
-    panel = gtk_frame_new(_("Input files and options"));
-    gtk_widget_set_size_request (panel, OPTION_PANEL_W, OPTION_PANEL_H);
-    
-    /* Sub-panel for input file listing and buttons */
-    vbox_input = gtk_vbox_new(FALSE, 1);
-    gtk_widget_set_size_request(vbox_input, INPUT_PANEL_W, INPUT_PANEL_H);
-    
-    /* Sub-sub-panel for input file listing */
-    scroll_input = gtk_scrolled_window_new(NULL, NULL);
-    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll_input), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-    gtk_widget_set_size_request(scroll_input, FILE_LIST_PANEL_W, FILE_LIST_PANEL_H);
-    
-    treeview_files = gtk_tree_view_new();
-    gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(treeview_files), FALSE);
-    gtk_tree_selection_set_mode (gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview_files)), GTK_SELECTION_MULTIPLE);
-    
-    /* Sub-panel for input file buttons */
-    
-    hbox_buttons = gtk_hbox_new(FALSE, 1);
-    gtk_widget_set_size_request(hbox_buttons, FILE_LIST_BUTTONS_PANEL_W, FILE_LIST_BUTTONS_PANEL_H);
-    
-    button_add = gtk_button_new_with_label(_("Add images"));
-    gtk_widget_set_size_request(button_add, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
-    button_remove = gtk_button_new_with_label(_("Remove images"));
-    gtk_widget_set_size_request(button_remove, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
-    
-    
-    /* All together */
-    gtk_box_pack_start(GTK_BOX(hbox_buttons), button_add, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(hbox_buttons), button_remove, FALSE, FALSE, 0);
-    
-    gtk_container_add (GTK_CONTAINER(scroll_input), treeview_files);
-        
-    gtk_box_pack_start(GTK_BOX(vbox_input), scroll_input, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(vbox_input), hbox_buttons, FALSE, FALSE, 0);
-    
-    gtk_container_add(GTK_CONTAINER(panel), vbox_input);
+static GtkWidget* option_panel_new(PlugInVals *vals) {
 
-    g_signal_connect(G_OBJECT(button_add), "clicked", G_CALLBACK(open_addfiles_popupmenu), NULL);
-    g_signal_connect(G_OBJECT(button_remove), "clicked", G_CALLBACK(open_removefiles_popupmenu), NULL);
-    g_signal_connect(G_OBJECT(gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview_files))), "changed", G_CALLBACK(select_filename), NULL);
-    
-    init_fileview();
-    refresh_fileview();
+  GtkWidget *panel;
+  GtkWidget *hbox_buttons;
+  GtkWidget *vbox_input;
+  GtkWidget *scroll_input;
+  GtkWidget *button_add, *button_remove;
+  GtkWidget *lbl_n_cols;
 
-    return panel;
+  GtkObject *adj_gutter_x;
+  GtkObject *adj_gutter_y;
+  GtkWidget *entry_gutter_x;
+  GtkWidget *entry_gutter_y;
+  GtkWidget *lbl_gutter_x;
+  GtkWidget *lbl_gutter_y;
+
+  GtkWidget *chain_gutter;
+
+  GtkWidget *table_optns;
+
+  gint       row;
+    
+  panel = gtk_frame_new(_("Input files and options"));
+  gtk_widget_set_size_request (panel, OPTION_PANEL_W, OPTION_PANEL_H);
+    
+  /* Sub-panel for input file listing and buttons */
+  vbox_input = gtk_vbox_new(FALSE, 1);
+  gtk_widget_set_size_request(vbox_input, INPUT_PANEL_W, INPUT_PANEL_H);
+    
+  /* Sub-sub-panel for input file listing */
+  scroll_input = gtk_scrolled_window_new(NULL, NULL);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll_input), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+  gtk_widget_set_size_request(scroll_input, FILE_LIST_PANEL_W, FILE_LIST_PANEL_H);
+    
+  treeview_files = gtk_tree_view_new();
+  gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(treeview_files), FALSE);
+  gtk_tree_selection_set_mode (gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview_files)), GTK_SELECTION_MULTIPLE);
+    
+  /* Sub-panel for input file buttons */
+  hbox_buttons = gtk_hbox_new(FALSE, 1);
+  gtk_widget_set_size_request(hbox_buttons, FILE_LIST_BUTTONS_PANEL_W, FILE_LIST_BUTTONS_PANEL_H);
+  lbl_files_info = gtk_label_new(_("Total Files: 0"));
+  gtk_widget_set_size_request(lbl_files_info, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
+  button_add = gtk_button_new_with_label(_("Add images"));
+  gtk_widget_set_size_request(button_add, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
+  button_remove = gtk_button_new_with_label(_("Remove images"));
+  gtk_widget_set_size_request(button_remove, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
+
+
+  /* Grid gutter/margin options */
+  gint yalign;
+  adj_gutter_x = gtk_adjustment_new(0, 0, 2<<16, 10, 0, 0);
+  lbl_gutter_x = gtk_label_new(_("Horizontal Spacing:"));
+  gtk_label_set_justify(lbl_gutter_x, GTK_JUSTIFY_RIGHT);
+  // Alignment!
+  // http://www.murrayc.com/permalink/2015/03/02/gtk-aligning-justification-in-text-widgets/
+  gtk_misc_get_alignment(lbl_gutter_x, NULL, &yalign);
+  gtk_misc_set_alignment(lbl_gutter_x, 1, 0.3);
+  entry_gutter_x = gtk_spin_button_new(GTK_ADJUSTMENT(adj_gutter_x), 0, 1);
+  gtk_spin_button_configure(entry_gutter_x,
+                            adj_gutter_x,
+                            0.5, 0);
+
+  adj_gutter_y = gtk_adjustment_new(0, 0, 2<<16, 10, 0, 0);
+  lbl_gutter_y = gtk_label_new(_("Vertical Spacing:"));
+  gtk_label_set_justify(lbl_gutter_y, GTK_JUSTIFY_RIGHT);
+  gtk_misc_get_alignment(lbl_gutter_y, NULL, &yalign);
+  gtk_misc_set_alignment(lbl_gutter_y, 1, 0.25);
+  entry_gutter_y = gtk_spin_button_new(GTK_ADJUSTMENT(adj_gutter_y), 0, 1);
+  gtk_spin_button_configure(entry_gutter_y,
+                            adj_gutter_y,
+                            0.5, 0);
+
+  //chain_gutter = gimp_chain_button_new(GIMP_CHAIN_RIGHT);
+  GtkWidget *margins = gimp_coordinates_new(GIMP_UNIT_PIXEL,
+                                            "%s",
+                                            TRUE,
+                                            FALSE,
+                                            SPIN_BUTTON_WIDTH,
+                                            GIMP_SIZE_ENTRY_UPDATE_SIZE,
+                                            TRUE,
+                                            FALSE,
+                                            _("Horizontal spacing"),
+                                            0,
+                                            300,
+                                            0,
+                                            2<<16,
+                                            0,
+                                            2<<16,
+                                            _("Vertical spacing"),
+                                            0,
+                                            300,
+                                            0,
+                                            2<<16,
+                                            0,
+                                            2<<16
+                                            );
+
+
+  table_optns = gtk_table_new(4,//rows
+                              3, //cols
+                              FALSE);
+  gtk_table_set_col_spacings (GTK_TABLE (table_optns), 6);
+  gtk_table_set_row_spacings (GTK_TABLE (table_optns), 2);
+
+  row = 2;
+  //vals->margin_x = 50;
+
+  adj_n_cols = gimp_scale_entry_new (GTK_TABLE (table_optns),
+                              0,
+                              1,
+                              NULL,
+                              SCALE_WIDTH, SPIN_BUTTON_WIDTH,
+                              vals->n_cols, 1, 1, 1, 10, 0,
+                              TRUE, 0, 0,
+                              _("Cols...tip"), NULL);
+  g_signal_connect (adj_n_cols, "value_changed",
+                    G_CALLBACK (gimp_int_adjustment_update),
+                    &vals->n_cols);
+  lbl_n_cols = gtk_label_new(_("Max number of columns:"));
+  gtk_misc_set_alignment(lbl_n_cols, 1, 0.3);
+  gtk_table_attach_defaults(table_optns, lbl_n_cols, 0, 1, 1, 2);
+
+
+  GtkWidget *cell_size = gimp_coordinates_new(GIMP_UNIT_PIXEL,
+                                            "%s",
+                                            TRUE,
+                                            FALSE,
+                                            SPIN_BUTTON_WIDTH,
+                                            GIMP_SIZE_ENTRY_UPDATE_SIZE,
+                                            TRUE,
+                                            FALSE,
+                                            _("Cell width"),
+                                            0,
+                                            300,
+                                            0,
+                                            2<<16,
+                                            0,
+                                            2<<16,
+                                            _("Cell height"),
+                                            0,
+                                            300,
+                                            0,
+                                            2<<16,
+                                            0,
+                                            2<<16
+                                            );
+
+  gtk_widget_set_sensitive(cell_size, FALSE);
+  int add_masks_val;
+  GtkWidget *add_masks = gtk_check_button_new_with_label(_("Add layer masks for each grid cell"));
+  g_signal_connect (add_masks, "toggled",
+                    G_CALLBACK(toggle_add_mask),
+                    cell_size);
+
+  /* All together */
+  gtk_box_pack_start(GTK_BOX(hbox_buttons), lbl_files_info, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(hbox_buttons), button_add, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(hbox_buttons), button_remove, FALSE, FALSE, 0);
+    
+  gtk_container_add(GTK_CONTAINER(scroll_input), treeview_files);
+
+            
+  
+  //gtk_table_attach_defaults(table_optns, lbl_gutter_x, 0, 1, 0, 1);
+  //gtk_table_attach_defaults(table_optns, entry_gutter_x, 1, 2, 0, 1);
+  gtk_table_attach_defaults(table_optns, margins, 1, 2, 0, 1);
+
+  //gtk_table_attach_defaults(table_optns, lbl_gutter_y, 0, 1, 1, 2);
+  //gtk_table_attach_defaults(table_optns, entry_gutter_y, 1, 2, 1, 2);
+  gtk_table_attach_defaults(table_optns, add_masks, 1, 2, 2, 3);
+
+  gtk_table_attach_defaults(table_optns, cell_size, 1, 2, 3, 4);
+
+
+  gtk_box_pack_start(GTK_BOX(vbox_input), scroll_input, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(vbox_input), hbox_buttons, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(vbox_input), table_optns, FALSE, FALSE, 0);
+
+  gtk_container_add(GTK_CONTAINER(panel), vbox_input);
+
+  g_signal_connect(G_OBJECT(button_add), "clicked", G_CALLBACK(open_addfiles_popupmenu), NULL);
+  g_signal_connect(G_OBJECT(button_remove), "clicked", G_CALLBACK(open_removefiles_popupmenu), NULL);
+  g_signal_connect(G_OBJECT(gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview_files))), "changed", G_CALLBACK(select_filename), NULL);
+    
+  init_fileview();
+  refresh_fileview();
+
+  return panel;
 }
 
 
@@ -425,6 +577,7 @@ void refresh_fileview() {
     GtkListStore *store;
     GtkTreeModel *model;
     GtkTreeIter  treeiter;
+    gint list_len;
 
     store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW (treeview_files)));
     model = gtk_tree_view_get_model (GTK_TREE_VIEW (treeview_files));
@@ -435,11 +588,34 @@ void refresh_fileview() {
     }
     
     GSList *iter;
-    if (g_slist_length(cgrid_input_filenames) > 0) {
+    list_len = g_slist_length(cgrid_input_filenames);
+    if (list_len > 0) {
         iter = cgrid_input_filenames;
         for (; iter; iter = iter->next) {
             add_to_fileview(iter->data);
         }
+    }
+    files_list_change_callback();
+}
+
+void files_list_change_callback() {
+    gint list_len;
+    gint adj_curr_upper;
+
+    if(NULL != n_files_text) {
+      free(n_files_text);
+    }
+    list_len = g_slist_length(cgrid_input_filenames);
+    n_files_text = calloc(list_len/10+1, sizeof(char));
+    sprintf(n_files_text, _("Total files: %d"), list_len);
+    gtk_label_set_text(lbl_files_info, n_files_text);
+
+    //adj_n_cols
+    adj_curr_upper = gtk_adjustment_get_upper(adj_n_cols);
+    gtk_adjustment_set_upper(adj_n_cols, list_len);
+    if(gtk_adjustment_get_value(adj_n_cols) >= list_len) {
+      // set the value to number of files
+      gtk_adjustment_set_value(adj_n_cols, list_len);  
     }
 }
 

@@ -147,6 +147,9 @@ run (const gchar      *name,
       break;
 
     case GIMP_RUN_INTERACTIVE:
+      g_print("GTK version %d.%d.%d\n",
+              GTK_MAJOR_VERSION, GTK_MINOR_VERSION, GTK_MICRO_VERSION);
+
       /*  Possibly retrieve data  */
       gimp_get_data (DATA_KEY_VALS,    &vals);
       gimp_get_data (DATA_KEY_UI_VALS, &ui_vals);
