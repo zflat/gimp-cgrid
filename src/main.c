@@ -110,7 +110,7 @@ static void query (void) {
                           G_N_ELEMENTS (args), 0,
                           args, NULL);
 
-  gimp_plugin_menu_register (PROCEDURE_NAME, "<Image>/File/Open");
+  gimp_plugin_menu_register (PROCEDURE_NAME, "<Image>/File/Create");
 }
 
 static void
