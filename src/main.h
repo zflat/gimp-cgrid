@@ -24,8 +24,8 @@ typedef struct
   gint     row_height;// height of one row
   gint     output_width; // output image widht
   gint     output_height;// outout image height
-  gint     margin_x; // horizonal margin between images
-  gint     margin_y; // vertical margin between images
+  gint     gutter_x; // horizonal gutter between images
+  gint     gutter_y; // vertical gutter between images
   gint     border_width;
   gint     seed;
   gboolean  random_seed;

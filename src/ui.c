@@ -63,7 +63,7 @@ static PlugInUIVals *ui_state = NULL;
 GtkWidget *panel_options;
 GtkWidget *popmenu_add, *popmenu_edit, *popmenu_addfiles, *popmenu_removefiles;
 GtkWidget *treeview_files;
-GtkWidget *margins;
+GtkWidget *gutters;
 GtkWidget *lbl_files_info;
 char *n_files_text = NULL;
 GtkWidget* adj_n_cols;
@@ -127,8 +127,8 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
 
   /* initalize values */
   
-  //gtk_entry_set_text(entry_gutter_x, vals->margin_x);
-  //gtk_entry_set_text(entry_gutter_x, vals->margin_y);
+  //gtk_entry_set_text(entry_gutter_x, vals->gutter_x);
+  //gtk_entry_set_text(entry_gutter_x, vals->gutter_y);
     
   cgrid_set_busy(FALSE);
   
@@ -144,12 +144,12 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
             vals->input_filenames = cgrid_input_filenames;
             vals->n_cols = gtk_adjustment_get_value(adj_n_cols);
 
-            vals->margin_x = gimp_units_to_pixels(gimp_size_entry_get_value(margins, 0), // value
-                                                  gimp_size_entry_get_unit(margins), //unit
+            vals->gutter_x = gimp_units_to_pixels(gimp_size_entry_get_value(gutters, 0), // value
+                                                  gimp_size_entry_get_unit(gutters), //unit
                                                   300// resolution
                                                   );
-            vals->margin_y = gimp_units_to_pixels(gimp_size_entry_get_value(margins, 1), // value
-                                                  gimp_size_entry_get_unit(margins), //unit
+            vals->gutter_y = gimp_units_to_pixels(gimp_size_entry_get_value(gutters, 1), // value
+                                                  gimp_size_entry_get_unit(gutters), //unit
                                                   300// resolution
                                                   );
 
@@ -237,7 +237,7 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
   gtk_widget_set_size_request(button_remove, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
 
 
-  /* Grid gutter/margin options */
+  /* Grid gutter/gutter options */
   gint yalign;
   adj_gutter_x = gtk_adjustment_new(0, 0, 2<<16, 10, 0, 0);
   lbl_gutter_x = gtk_label_new(_("Horizontal Spacing:"));
@@ -262,7 +262,7 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
                             0.5, 0);
 
   //chain_gutter = gimp_chain_button_new(GIMP_CHAIN_RIGHT);
-  margins = gimp_coordinates_new(GIMP_UNIT_PIXEL,
+  gutters = gimp_coordinates_new(GIMP_UNIT_PIXEL,
                                             "%s",
                                             TRUE,
                                             FALSE,
@@ -294,7 +294,7 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
   gtk_table_set_row_spacings (GTK_TABLE (table_optns), 2);
 
   row = 2;
-  //vals->margin_x = 50;
+  //vals->gutter_x = 50;
 
   adj_n_cols = gimp_scale_entry_new (GTK_TABLE (table_optns),
                               0,
@@ -354,7 +354,7 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
   
   //gtk_table_attach_defaults(table_optns, lbl_gutter_x, 0, 1, 0, 1);
   //gtk_table_attach_defaults(table_optns, entry_gutter_x, 1, 2, 0, 1);
-  gtk_table_attach_defaults(table_optns, margins, 1, 2, 0, 1);
+  gtk_table_attach_defaults(table_optns, gutters, 1, 2, 0, 1);
 
   //gtk_table_attach_defaults(table_optns, lbl_gutter_y, 0, 1, 1, 2);
   //gtk_table_attach_defaults(table_optns, entry_gutter_y, 1, 2, 1, 2);

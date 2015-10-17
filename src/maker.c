@@ -20,10 +20,10 @@ gboolean   build_image_grid (PlugInVals *vals) {
 
   g_printf("Selected %d images.\n", g_slist_length(vals->input_filenames));
   g_printf("first filename: %s\n", vals->input_filenames->data);
-  g_printf("gutter x: %d\n", vals->margin_x);
-  g_printf("gutter y: %d\n", vals->margin_y);
+  g_printf("gutter x: %d\n", vals->gutter_x);
+  g_printf("gutter y: %d\n", vals->gutter_y);
 
-  vals->image_ID = gimp_image_new(MAX((gint)vals->margin_x, 1), MAX((gint)vals->margin_y, 1), GIMP_RGB);
+  vals->image_ID = gimp_image_new(MAX((gint)vals->gutter_x, 1), MAX((gint)vals->gutter_y, 1), GIMP_RGB);
 
   if(vals->image_ID <= 0) {
     return FALSE;
@@ -48,8 +48,8 @@ gboolean compute_location(gint position_num, PlugInVals *vals, gint *x_location,
 
   g_printf("position: %d, row=%d col=%d \n",position_num, row_num, col_num);
   
-  *x_location = vals->margin_x + col_num * vals->col_width;
-  *y_location = vals->margin_y + row_num * vals->row_height;
+  *x_location = vals->gutter_x + col_num * vals->col_width;
+  *y_location = vals->gutter_y + row_num * vals->row_height;
 }
 
 gboolean place_layer_action(InputNode *node,  PlugInVals *vals) {
@@ -69,8 +69,8 @@ gboolean place_layer_action(InputNode *node,  PlugInVals *vals) {
 gboolean compute_image_size(PlugInVals *vals) {
   gint n_images;
 
-  gint total_margin_x;
-  gint total_margin_y;
+  gint total_gutter_x;
+  gint total_gutter_y;
   
   n_images = g_slist_length(vals->input_filenames);
   vals->n_rows = compute_n_rows(n_images, vals->n_cols);
@@ -78,13 +78,13 @@ gboolean compute_image_size(PlugInVals *vals) {
   
   // compute width
   // width of one column
-  vals->col_width = vals->margin_x + vals->max_input_x;
-  vals->output_width = vals->margin_x + (vals->n_cols * vals->col_width);
+  vals->col_width = vals->gutter_x + vals->max_input_x;
+  vals->output_width = vals->gutter_x + (vals->n_cols * vals->col_width);
 
   // compute height
   // height of one row
-  vals->row_height = vals->margin_y + vals->max_input_y;  
-  vals->output_height = vals->margin_y + (vals->n_rows * vals->row_height);
+  vals->row_height = vals->gutter_y + vals->max_input_y;  
+  vals->output_height = vals->gutter_y + (vals->n_rows * vals->row_height);
 
   return TRUE;  
 }
