@@ -67,6 +67,7 @@ GtkWidget *gutters;
 GtkWidget *lbl_files_info;
 char *n_files_text = NULL;
 GtkWidget* adj_n_cols;
+GtkWidget *spin_button_resolution;
 
 //GtkWidget* progressbar_visible;
 enum /* TreeView stuff... */
@@ -76,6 +77,12 @@ enum /* TreeView stuff... */
 };
 
 //const gchar* progressbar_data;
+
+
+static void window_close_callback(GtkWidget* widget, gpointer data) {
+  gtk_dialog_response(widget, GTK_RESPONSE_CLOSE);
+}
+
 
 /*  Public functions  */
 
@@ -87,16 +94,16 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
     
   cgrid_window_main = 
     gimp_dialog_new(
-                    PLUG_IN_FULLNAME,
-                    PLUG_IN_BINARY,
-                    NULL,
-                    0,
-                    NULL,
-                    NULL,
-                    GTK_STOCK_ABOUT, GTK_RESPONSE_HELP,
+                    PLUG_IN_FULLNAME, // title
+                    PLUG_IN_BINARY,   //role
+                    NULL, // paren
+                    0, //flags
+                    NULL, // help func
+                    NULL, // held_id
+                    //GTK_STOCK_ABOUT, GTK_RESPONSE_HELP,
                     GTK_STOCK_OK,     GTK_RESPONSE_OK,
-                    GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, NULL
-                    );
+                    GTK_STOCK_CLOSE, GTK_RESPONSE_CLOSE,
+                    NULL);
     
   gimp_window_set_transient (GTK_WINDOW(cgrid_window_main));
   gtk_widget_set_size_request (cgrid_window_main, MAIN_WINDOW_W, MAIN_WINDOW_H);
@@ -112,23 +119,17 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
   panel_options = option_panel_new(vals);
   popmenus_init();
   
-  /*  
-  progressbar_visible = gtk_progress_bar_new();
-  gtk_widget_set_size_request (progressbar_visible, PROGRESSBAR_W, PROGRESSBAR_H);
-  progressbar_data = progressbar_init_hidden();
-  */
-    
   gtk_box_pack_start(GTK_BOX(vbox_main), panel_options, FALSE, FALSE, 0);
-  //gtk_box_pack_start(GTK_BOX(vbox_main), progressbar_visible, FALSE, FALSE, 0);
-
   gtk_container_add (GTK_CONTAINER (GTK_DIALOG(cgrid_window_main)->vbox), vbox_main);
-  gtk_widget_show_all(cgrid_window_main);
-  //gtk_widget_hide(button_preview);
 
-  /* initalize values */
-  
-  //gtk_entry_set_text(entry_gutter_x, vals->gutter_x);
-  //gtk_entry_set_text(entry_gutter_x, vals->gutter_y);
+
+  g_signal_connect (cgrid_window_main, 
+                    "close",
+                    G_CALLBACK (window_close_callback),
+                    NULL);
+
+  gtk_widget_show_all(cgrid_window_main);
+
     
   cgrid_set_busy(FALSE);
   
@@ -143,14 +144,14 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
             /* Set options */
             vals->input_filenames = cgrid_input_filenames;
             vals->n_cols = gtk_adjustment_get_value(adj_n_cols);
-
+            gdouble resolution = gtk_spin_button_get_value(spin_button_resolution);
             vals->gutter_x = gimp_units_to_pixels(gimp_size_entry_get_value(gutters, 0), // value
                                                   gimp_size_entry_get_unit(gutters), //unit
-                                                  300// resolution
+                                                  resolution
                                                   );
             vals->gutter_y = gimp_units_to_pixels(gimp_size_entry_get_value(gutters, 1), // value
                                                   gimp_size_entry_get_unit(gutters), //unit
-                                                  300// resolution
+                                                  resolution
                                                   );
 
             g_printf("processing files...\n\a");
@@ -162,7 +163,7 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
         else if (run == GTK_RESPONSE_HELP) {
           /* open_about();*/ 
         }
-        else if (run == GTK_RESPONSE_CANCEL) {
+        else if (run == GTK_RESPONSE_CLOSE) {
             retval = FALSE;
             break;
         }
@@ -176,16 +177,25 @@ static gboolean dialog_image_constraint_func (gint32 image_id, gpointer  data) {
   return (gimp_image_base_type (image_id) == GIMP_RGB);
 }
 
-static void toggle_add_mask(GtkWidget *widget, gpointer data) {
-    if (GTK_TOGGLE_BUTTON (widget)->active) {
-        /* If control reaches here, the toggle button is down */
-      gtk_widget_set_sensitive(data, TRUE);
-    } else {
-        /* If control reaches here, the toggle button is up */
-      gtk_widget_set_sensitive(data, FALSE);
-    }
+
+static void toggle_resolution_sensitive(GtkWidget* widget, gpointer data) {
+  GimpUnit current_unit = gimp_size_entry_get_unit(widget);
+  gtk_widget_set_sensitive(data, (current_unit != GIMP_UNIT_PIXEL));
 }
 
+static void changed_resolution_callback(GtkWidget* widget, gpointer data) {
+  gdouble resolution = gtk_spin_button_get_value(widget);
+  gimp_size_entry_set_resolution(data, // GimpSizeEntry
+                                 0, // field
+                                 resolution,
+                                 FALSE
+                                 );
+  gimp_size_entry_set_resolution(data, // GimpSizeEntry
+                                 1, // field
+                                 resolution,
+                                 FALSE
+                                 );
+}
 
 /* builds and returns the panel with file list and options */
 static GtkWidget* option_panel_new(PlugInVals *vals) {
@@ -197,19 +207,12 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
   GtkWidget *button_add, *button_remove;
   GtkWidget *lbl_n_cols;
 
-  GtkObject *adj_gutter_x;
-  GtkObject *adj_gutter_y;
-  GtkWidget *entry_gutter_x;
-  GtkWidget *entry_gutter_y;
-  GtkWidget *lbl_gutter_x;
-  GtkWidget *lbl_gutter_y;
-
-  GtkWidget *chain_gutter;
+  GtkWidget *hbox_resolution;
+  GtkWidget *lbl_resolution;
+  GtkWidget *lbl_resolution_desc;
 
   GtkWidget *table_optns;
 
-  gint       row;
-    
   panel = gtk_frame_new(_("Input files and options"));
   gtk_widget_set_size_request (panel, OPTION_PANEL_W, OPTION_PANEL_H);
     
@@ -236,32 +239,6 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
   button_remove = gtk_button_new_with_label(_("Remove images"));
   gtk_widget_set_size_request(button_remove, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
 
-
-  /* Grid gutter/gutter options */
-  gint yalign;
-  adj_gutter_x = gtk_adjustment_new(0, 0, 2<<16, 10, 0, 0);
-  lbl_gutter_x = gtk_label_new(_("Horizontal Spacing:"));
-  gtk_label_set_justify(lbl_gutter_x, GTK_JUSTIFY_RIGHT);
-  // Alignment!
-  // http://www.murrayc.com/permalink/2015/03/02/gtk-aligning-justification-in-text-widgets/
-  gtk_misc_get_alignment(lbl_gutter_x, NULL, &yalign);
-  gtk_misc_set_alignment(lbl_gutter_x, 1, 0.3);
-  entry_gutter_x = gtk_spin_button_new(GTK_ADJUSTMENT(adj_gutter_x), 0, 1);
-  gtk_spin_button_configure(entry_gutter_x,
-                            adj_gutter_x,
-                            0.5, 0);
-
-  adj_gutter_y = gtk_adjustment_new(0, 0, 2<<16, 10, 0, 0);
-  lbl_gutter_y = gtk_label_new(_("Vertical Spacing:"));
-  gtk_label_set_justify(lbl_gutter_y, GTK_JUSTIFY_RIGHT);
-  gtk_misc_get_alignment(lbl_gutter_y, NULL, &yalign);
-  gtk_misc_set_alignment(lbl_gutter_y, 1, 0.25);
-  entry_gutter_y = gtk_spin_button_new(GTK_ADJUSTMENT(adj_gutter_y), 0, 1);
-  gtk_spin_button_configure(entry_gutter_y,
-                            adj_gutter_y,
-                            0.5, 0);
-
-  //chain_gutter = gimp_chain_button_new(GIMP_CHAIN_RIGHT);
   gutters = gimp_coordinates_new(GIMP_UNIT_PIXEL,
                                             "%s",
                                             TRUE,
@@ -293,55 +270,43 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
   gtk_table_set_col_spacings (GTK_TABLE (table_optns), 6);
   gtk_table_set_row_spacings (GTK_TABLE (table_optns), 2);
 
-  row = 2;
-  //vals->gutter_x = 50;
-
   adj_n_cols = gimp_scale_entry_new (GTK_TABLE (table_optns),
-                              0,
-                              1,
-                              NULL,
-                              SCALE_WIDTH, SPIN_BUTTON_WIDTH,
-                              vals->n_cols, 1, 1, 1, 10, 0,
-                              TRUE, 0, 0,
-                              _("Cols...tip"), NULL);
+                                     0, // column
+                                     2, // row
+                                     NULL, // text
+                                     SCALE_WIDTH, SPIN_BUTTON_WIDTH,
+                                     vals->n_cols, 1, 1, 1, 10, 0,
+                                     TRUE, 0, 0,
+                                     _("Cols...tip"), NULL);
+  lbl_n_cols = gtk_label_new(_("Max number of columns:"));
+  gtk_misc_set_alignment(lbl_n_cols, 1, 0.3);
+  gtk_table_attach_defaults(table_optns, 
+                            lbl_n_cols, 
+                            0, // left
+                            1, // right
+                            2, // top 
+                            3);// bottom
   g_signal_connect (adj_n_cols, "value_changed",
                     G_CALLBACK (gimp_int_adjustment_update),
                     &vals->n_cols);
-  lbl_n_cols = gtk_label_new(_("Max number of columns:"));
-  gtk_misc_set_alignment(lbl_n_cols, 1, 0.3);
-  gtk_table_attach_defaults(table_optns, lbl_n_cols, 0, 1, 1, 2);
 
+  hbox_resolution = gtk_hbox_new(FALSE, 1);
+  //gtk_widget_set_size_request(hbox_resolution, FILE_LIST_BUTTONS_PANEL_W, FILE_LIST_BUTTONS_PANEL_H);
+  lbl_resolution = gtk_label_new(_("Resolution: "));
+  lbl_resolution_desc = gtk_label_new(_("DPI"));
+  spin_button_resolution = gtk_spin_button_new_with_range(1, 2<<16, 50);
+  gtk_spin_button_set_value(spin_button_resolution, 
+                            300);
+  gtk_widget_set_sensitive(spin_button_resolution, FALSE);
+  g_signal_connect(gutters, 
+                   "unit_changed",
+                   G_CALLBACK(toggle_resolution_sensitive),
+                   spin_button_resolution);
+  g_signal_connect(spin_button_resolution, 
+                   "value_changed",
+                   G_CALLBACK(changed_resolution_callback),
+                   gutters);
 
-  GtkWidget *cell_size = gimp_coordinates_new(GIMP_UNIT_PIXEL,
-                                            "%s",
-                                            TRUE,
-                                            FALSE,
-                                            SPIN_BUTTON_WIDTH,
-                                            GIMP_SIZE_ENTRY_UPDATE_SIZE,
-                                            TRUE,
-                                            FALSE,
-                                            _("Cell width"),
-                                            0,
-                                            300,
-                                            0,
-                                            2<<16,
-                                            0,
-                                            2<<16,
-                                            _("Cell height"),
-                                            0,
-                                            300,
-                                            0,
-                                            2<<16,
-                                            0,
-                                            2<<16
-                                            );
-
-  gtk_widget_set_sensitive(cell_size, FALSE);
-  int add_masks_val;
-  GtkWidget *add_masks = gtk_check_button_new_with_label(_("Add layer masks for each grid cell"));
-  g_signal_connect (add_masks, "toggled",
-                    G_CALLBACK(toggle_add_mask),
-                    cell_size);
 
   /* All together */
   gtk_box_pack_start(GTK_BOX(hbox_buttons), lbl_files_info, FALSE, FALSE, 0);
@@ -350,18 +315,22 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
     
   gtk_container_add(GTK_CONTAINER(scroll_input), treeview_files);
 
-            
-  
-  //gtk_table_attach_defaults(table_optns, lbl_gutter_x, 0, 1, 0, 1);
-  //gtk_table_attach_defaults(table_optns, entry_gutter_x, 1, 2, 0, 1);
-  gtk_table_attach_defaults(table_optns, gutters, 1, 2, 0, 1);
+  gtk_table_attach_defaults(table_optns, 
+                            gutters, 
+                            1, // left
+                            2, // right 
+                            0, // top
+                            1);// bottom
 
-  //gtk_table_attach_defaults(table_optns, lbl_gutter_y, 0, 1, 1, 2);
-  //gtk_table_attach_defaults(table_optns, entry_gutter_y, 1, 2, 1, 2);
-  gtk_table_attach_defaults(table_optns, add_masks, 1, 2, 2, 3);
-
-  gtk_table_attach_defaults(table_optns, cell_size, 1, 2, 3, 4);
-
+  gtk_box_pack_start(GTK_BOX(hbox_resolution), lbl_resolution, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(hbox_resolution), spin_button_resolution, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(hbox_resolution), lbl_resolution_desc, FALSE, FALSE, 0);
+  gtk_table_attach_defaults(table_optns, 
+                            hbox_resolution, 
+                            1, // left
+                            2, // right
+                            1, // top 
+                            2);// bottom
 
   gtk_box_pack_start(GTK_BOX(vbox_input), scroll_input, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(vbox_input), hbox_buttons, FALSE, FALSE, 0);
