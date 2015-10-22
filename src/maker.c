@@ -36,7 +36,11 @@ gboolean   build_image_grid (PlugInVals *vals) {
   gimp_image_resize(vals->image_ID, vals->output_width, vals->output_height, 0, 0);
 
   // insert each layer into the image
-  g_slist_foreach(vals->input_nodes, place_layer_action, vals);
+  GSList * starting_node = g_slist_last(vals->input_nodes);
+  GSList * rev_list = g_slist_reverse(vals->input_nodes);
+  vals->input_nodes = starting_node;
+  g_slist_foreach(vals->input_nodes, 
+                  place_layer_action, vals);
     
   // display the image
   new_image_display = gimp_display_new(vals->image_ID);
@@ -73,6 +77,11 @@ gboolean place_layer_action(InputNode *node,  PlugInVals *vals) {
   
   // place the layer in its position
   gimp_layer_set_offsets(node->layer_ID, x_location, y_location);
+
+  // add alpha to the layer, implicit change to RGBA
+  gimp_layer_add_alpha(node->layer_ID);
+  // resize the layer
+  // gimp_layer_resize_to_image_size(node->layer_ID);
 }
 
 gboolean compute_image_size(PlugInVals *vals) {

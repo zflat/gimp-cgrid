@@ -154,8 +154,10 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
                                                   resolution
                                                   );
 
-            g_printf("processing files...\n\a");
             vals->input_nodes = NULL;
+            vals->max_input_x = 0;
+            vals->max_input_y = 0;
+            g_printf("processing files...\n\a");
             retval = TRUE;
             break;
           }

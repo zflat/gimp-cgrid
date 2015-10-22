@@ -39,7 +39,7 @@ static void   run   (const gchar      *name,
 
 const PlugInVals default_vals =
   {
-    NULL,
+    NULL, // input file names
     1, // n_cols
     0, // n_rows
     0, // col_width
@@ -49,8 +49,8 @@ const PlugInVals default_vals =
     20, // margin_x
     20, // margin_y
     0,  // border_width
-    0, 
-    FALSE,
+    0,  // seed
+    FALSE, // random seed
     0, // image ID
     NULL, // list 
     0, // max x 
