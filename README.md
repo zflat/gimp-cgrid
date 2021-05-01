@@ -8,6 +8,12 @@ I originally made this as a way to quickly create a typology from a large number
 
 ## Install
 
+### Dependencies
+
+  ```
+  sudo apt install libtool intltool libgimp2.0-dev
+  ```
+
 To build and install it, just ...
 
 	./configure
