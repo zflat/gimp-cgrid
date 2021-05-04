@@ -12,6 +12,7 @@ PROJECT="GIMP Collection Grid Maker"
 TEST_TYPE=-f
 FILE=src/render.c
 
+
 AUTOCONF_REQUIRED_VERSION=2.54
 AUTOMAKE_REQUIRED_VERSION=1.6
 GLIB_REQUIRED_VERSION=2.0.0
@@ -86,6 +87,12 @@ elif (automake-1.13 --version) < /dev/null > /dev/null 2>&1; then
 elif (automake-1.14 --version) < /dev/null > /dev/null 2>&1; then
    AUTOMAKE=automake-1.14
    ACLOCAL=aclocal-1.14
+elif (automake-1.15 --version) < /dev/null > /dev/null 2>&1; then
+   AUTOMAKE=automake-1.15
+   ACLOCAL=aclocal-1.15
+elif (automake-1.16 --version) < /dev/null > /dev/null 2>&1; then
+   AUTOMAKE=automake-1.16
+   ACLOCAL=aclocal-1.16
 else
     echo
     echo "  You must have automake 1.6 or newer installed to compile $PROJECT."
