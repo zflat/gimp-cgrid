@@ -1,25 +1,737 @@
+
+
 /* 
+ gimptool-2.0 --build cgrid.c
+
+  See https://gimpbook.com/scripting/
+https://developer.gimp.org/plug-ins.html
  */
 
-#include "config.h"
+#include <string.h>
 
+#include <gtk/gtk.h>
 #include <libgimp/gimp.h>
 #include <libgimp/gimpui.h>
 
-#include "main.h"
-#include "ui.h"
-#include "cgrid_utils.h"
-#include "plugin-intl.h"
+
+#define PLUGIN_RESULT_OK 1
+#define PLUGIN_RESULT_WARNING 0
+#define PLUGIN_RESULT_ERROR -1
+
+typedef struct{
+  gint32 layer_ID;
+  gint32 mat_layer_ID; // for the border
+  gint32 group_ID;
+  gint   position_n;
+} InputNode;
+
+typedef struct
+{
+  GSList   *input_filenames; // list of image file names & position in the grid
+  gint     n_cols; // number of images wide to make the grid
+  gint     n_rows; // number of images tall to make the grid
+  gint     col_width; // width of one column
+  gint     row_height;// height of one row
+  gint     output_width; // output image widht
+  gint     output_height;// outout image height
+  gint     gutter_x; // horizonal gutter between images
+  gint     gutter_y; // vertical gutter between images
+  gint     border_width;
+  gint     seed;
+  gboolean  random_seed;
+  gint32    image_ID;
+  GSList   *input_nodes; // list of InputNode layer ids & position in the grid
+  gint      max_input_x; // input image max width
+  gint      max_input_y; // input image max height
+} PlugInVals;
+
+typedef struct
+{
+  gint32    image_id;
+} PlugInImageVals;
+
+typedef struct
+{
+  gint32    drawable_id;
+} PlugInDrawableVals;
+
+typedef struct
+{
+  gboolean  chain_active;
+} PlugInUIVals;
 
 
-/*  Constants  */
+/*  Default values  */
+
+
+#define PLUG_IN_FULLNAME "Collection Grid Maker"
+#define PLUG_IN_DESCRIPTION "Arrange a collection of images in a grid or strip"
+#define PLUG_IN_COPYRIGHT "(C) 2015 - William Wedler"
+#define PLUG_IN_WEBSITE "http://wwedler.com"
+#define PLUG_IN_BINARY "cgrid"
+#define PLUG_IN_PROC "plug-in-cgrid"
+#define PLUG_IN_VERSION "0.1.0"
+
+extern const PlugInVals         default_vals;
+extern const PlugInImageVals    default_image_vals;
+extern const PlugInDrawableVals default_drawable_vals;
+extern const PlugInUIVals       default_ui_vals;
+
+GSList *cgrid_input_filenames;
+gboolean plugin_is_busy;
+
+gboolean cleanupInputNode(InputNode *node);
+
+
+
+
+
+#define MAIN_WINDOW_W 660
+#define MAIN_WINDOW_H 470
+
+#define PROGRESSBAR_W MAIN_WINDOW_W - 30
+#define PROGRESSBAR_H 20
+
+/* Option panel (and children) dimensions */
+#define OPTION_PANEL_W MAIN_WINDOW_W - 30
+#define OPTION_PANEL_H MAIN_WINDOW_H - PROGRESSBAR_H - 80
+
+#define INPUT_PANEL_W 350
+#define INPUT_PANEL_H OPTION_PANEL_H - 30
+
+#define USEROPTIONS_PANEL_W OPTION_PANEL_W - INPUT_PANEL_W - 10
+#define USEROPTIONS_PANEL_H OPTION_PANEL_H - 10
+
+#define USEROPTIONS_CHOOSER_W USEROPTIONS_PANEL_W - 40
+#define USEROPTIONS_CHOOSER_H 40
+
+#define FILE_PREVIEW_W 150
+#define FILE_PREVIEW_H 130
+
+#define FILE_LIST_PANEL_W INPUT_PANEL_W
+#define FILE_LIST_PANEL_H 200
+
+#define FILE_LIST_BUTTONS_PANEL_W FILE_LIST_PANEL_W
+#define FILE_LIST_BUTTONS_PANEL_H 30
+
+#define FILE_LIST_BUTTON_W FILE_LIST_BUTTONS_PANEL_W / 2
+#define FILE_LIST_BUTTON_H FILE_LIST_BUTTONS_PANEL_H
+
+#define PREVIEW_WINDOW_W 600
+#define PREVIEW_WINDOW_H 320
+
+#define PREVIEW_IMG_W (PREVIEW_WINDOW_W / 2) - 30
+#define PREVIEW_IMG_H 220
+
+
+char* str_replace(char*, char*, char*);
+char* comp_get_filename(char*);
+char* comp_get_filefolder(char*);
+gboolean str_contains_cins(char*, char*);
+gboolean file_has_extension(char*, char*);
+GimpParamDef pdb_proc_get_param_info(gchar*, gint);
+char* get_user_dir(void); 
+/* char* get_cgrid_localedir(void); */
+int glib_strcmpi(gconstpointer, gconstpointer);
+gchar** get_path_folders (char*);
+char* get_datetime(void);
+time_t get_modification_time(char*);
+int set_modification_time(char*, time_t);
+
+#if defined _WIN32
+#define FILE_SEPARATOR '\\'
+#define FILE_SEPARATOR_STR "\\"
+#else
+#define FILE_SEPARATOR '/'
+#define FILE_SEPARATOR_STR "/"
+#endif
+
+#define MIN(a,b) (a < b ? a : b)
+#define MAX(a,b) (a > b ? a : b)
+
+#define CEILING_POS(X) ((X-(int)(X)) > 0 ? (int)(X+1) : (int)(X))
+#define FLOOR_POS(X) ((int)(X))
+
+gint compute_n_rows(gint total_elems, gint n_cols);
+
+
+GtkWidget* cgrid_window_main;
+
+
+gboolean   dialog (
+		   PlugInVals         *vals,
+		   PlugInUIVals       *ui_vals);
+
+
+void   render (gint32              image_ID,
+	       GimpDrawable       *drawable,
+	       PlugInVals         *vals,
+	       PlugInImageVals    *image_vals,
+	       PlugInDrawableVals *drawable_vals)
+{
+  g_message ("All images loaded. Finished creating grid.");
+}
+
+gboolean   build_image_grid (PlugInVals *vals);
+
+/**
+ * Callback used to iterate over the file names
+ * Acts to load the file as a layer and to compute
+ * the max widht/height of the input images
+ * 
+ * The max width/height and layer IDs are stored
+ * in the *vals struct.
+ */
+gboolean load_input_layer_action(gchar *input_filename, PlugInVals *vals);
+
+/**
+ * Callback used to place each layer onto the image
+ * at its specified location.
+ */
+gboolean place_layer_action(InputNode *node,  PlugInVals *vals);
+
+/**
+ * imge size base on 
+ * max width
+ * max height
+ * number of rows
+ * number of columns
+ * margins x and y
+ */
+gboolean compute_image_size(PlugInVals *vals);
+
+/**
+ * Compute the x,y location for the given position number
+ * and the number of rows and cols and width & height of 
+ * the image
+ */
+gboolean compute_location(gint position_num, PlugInVals *vals, gint im_width, gint im_height, gint *x_location, gint *y_location);
+
+
+
+#define PROCEDURE_NAME   "gimp_collection_grid_maker"
+
+#define DATA_KEY_VALS    "plug_in_template"
+#define DATA_KEY_UI_VALS "plug_in_template_ui"
+
+#define PARASITE_KEY     "plug-in-template-options"
+
+
+
+static void   query (void);
+static void   run   (const gchar      *name,
+                     gint              nparams,
+                     const GimpParam  *param,
+                     gint             *nreturn_vals,
+                     GimpParam       **return_vals);
+
+
+const PlugInVals default_vals =
+  {
+    NULL, // input file names
+    1, // n_cols
+    0, // n_rows
+    0, // col_width
+    0, // row_height
+    1, // output image width
+    1, // output image height
+    20, // margin_x
+    20, // margin_y
+    0,  // border_width
+    0,  // seed
+    FALSE, // random seed
+    0, // image ID
+    NULL, // list 
+    0, // max x 
+    0  // max y
+  };
+
+const PlugInUIVals default_ui_vals =
+  {
+    TRUE
+  };
+
+static PlugInVals         vals;
+static PlugInImageVals    image_vals;
+static PlugInDrawableVals drawable_vals;
+static PlugInUIVals       ui_vals;
+
+
+GimpPlugInInfo PLUG_IN_INFO =
+  {
+    NULL,  /* init_proc  */
+    NULL,  /* quit_proc  */
+    query, /* query_proc */
+    run,   /* run_proc   */
+  };
+
+MAIN ()
+
+static void query (void) {
+  gchar *help_path;
+  gchar *help_uri;
+
+  static GimpParamDef args[] =
+    {
+      { GIMP_PDB_INT32,    "run_mode",   "Interactive, non-interactive"    },
+    };
+
+  // gimp_plugin_domain_register (GETTEXT_PACKAGE, LOCALEDIR);
+
+  /* help_path = g_build_filename (DATADIR, "help", NULL); */
+  /* help_uri = g_filename_to_uri (help_path, NULL, NULL); */
+  /* g_free (help_path); */
+
+  /* gimp_plugin_help_register ("http://developer.gimp.org/plug-in-template/help", */
+  /*                            help_uri); */
+
+  /* g_free (help_uri); */
+
+  gimp_install_procedure (PROCEDURE_NAME,
+                          PLUG_IN_DESCRIPTION,
+                          "William Wedler",
+                          "William Wedler",
+                          "wwedler.com",
+                          "2015",
+                          "Collection Grid Maker...",
+                          "",
+                          GIMP_PLUGIN,
+                          G_N_ELEMENTS (args), 0,
+                          args, NULL);
+
+  gimp_plugin_menu_register (PROCEDURE_NAME, "<Image>/File/Create");
+}
+
+static void
+run (const gchar      *name,
+     gint              n_params,
+     const GimpParam  *param,
+     gint             *nreturn_vals,
+     GimpParam       **return_vals) {
+  static GimpParam   values[1];
+  GimpDrawable      *drawable;
+  gint32             image_ID;
+  GimpRunMode        run_mode;
+  GimpPDBStatusType  status = GIMP_PDB_SUCCESS;
+
+  *nreturn_vals = 1;
+  *return_vals  = values;
+
+  /*  Initialize i18n support  */
+/*   bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR); */
+/* #ifdef HAVE_BIND_TEXTDOMAIN_CODESET */
+/*   bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8"); */
+/* #endif */
+/*   textdomain (GETTEXT_PACKAGE); */
+
+  run_mode = param[0].data.d_int32;
+
+  /*  Initialize with default values  */
+  vals          = default_vals;
+  ui_vals       = default_ui_vals;
+
+  if (strcmp (name, PROCEDURE_NAME) == 0) {
+    switch (run_mode)	{
+    case GIMP_RUN_NONINTERACTIVE:
+      break;
+
+    case GIMP_RUN_INTERACTIVE:
+      g_print("GTK version %d.%d.%d\n",
+              GTK_MAJOR_VERSION, GTK_MINOR_VERSION, GTK_MICRO_VERSION);
+
+      /*  Possibly retrieve data  */
+      gimp_get_data (DATA_KEY_VALS,    &vals);
+      gimp_get_data (DATA_KEY_UI_VALS, &ui_vals);
+
+      if ( !dialog(&vals, &ui_vals) ) {
+	      status = GIMP_PDB_CANCEL;
+        break;
+	    } 
+
+      if( !build_image_grid(&vals)  ) {
+        break;
+      }
+
+      break;
+    case GIMP_RUN_WITH_LAST_VALS:
+      /*  Possibly retrieve data  */
+      gimp_get_data (DATA_KEY_VALS, &vals);
+
+      if (vals.random_seed)
+        vals.seed = g_random_int ();
+      break;
+
+    default:
+      break;
+    }
+  } else {
+    status = GIMP_PDB_CALLING_ERROR;
+  }
+
+  if (status == GIMP_PDB_SUCCESS) {
+    render (NULL, NULL, &vals, NULL, NULL);
+
+    if (run_mode != GIMP_RUN_NONINTERACTIVE)
+      gimp_displays_flush ();
+
+    if (run_mode == GIMP_RUN_INTERACTIVE) {
+      gimp_set_data (DATA_KEY_VALS,    &vals,    sizeof (vals));
+      gimp_set_data (DATA_KEY_UI_VALS, &ui_vals, sizeof (ui_vals));
+    }
+    if(NULL != drawable) {
+      gimp_drawable_detach (drawable);
+    }
+
+    // cleanup vals
+    g_slist_free_full(vals.input_nodes, cleanupInputNode);
+    g_slist_free(vals.input_filenames);
+
+  }
+  values[0].type = GIMP_PDB_STATUS;
+  values[0].data.d_status = status;
+}
+
+gboolean cleanupInputNode(InputNode *node) {
+  if(node) {
+    free(node);
+  }
+}
+
+#include <sys/stat.h>
+#include <time.h>
+#include <utime.h>
+
+/* replace all the occurrences of 'rep' into 'orig' with text 'with' */
+char* str_replace(char *orig, char *rep, char *with) {
+    char *result;
+    char *ins;
+    char *tmp;
+    int len_rep;
+    int len_with;
+    int len_front;
+    int count;
+
+    if (!orig) {
+        return NULL;
+    }
+    if (!rep || !(len_rep = strlen(rep))) {
+        return NULL;
+    }
+    if (!(ins = strstr(orig, rep))) {
+        return NULL;
+    }
+    
+    if (!with) {
+        with = "";
+    }
+
+    len_with = strlen(with);
+
+    for (count = 0; tmp = strstr(ins, rep); ++count) {
+        ins = tmp + len_rep;
+    }
+
+    tmp = result = malloc(strlen(orig) + (len_with - len_rep) * count + 1);
+
+    if (!result) {
+        return NULL;
+    }
+    
+    while (count--) {
+        ins = strstr(orig, rep);
+        len_front = ins - orig;
+        tmp = strncpy(tmp, orig, len_front) + len_front;
+        tmp = strcpy(tmp, with) + len_with;
+        orig += len_front + len_rep;
+    }
+    strcpy(tmp, orig);
+    return result;
+}
+
+/* gets the filename from the given path 
+ * (compatible with unix and win) */
+char* comp_get_filename(char* path) {
+    char *pfile;
+    
+    pfile = path + strlen(path);
+    for (; pfile > path; pfile--)
+    {
+        if ((*pfile == FILE_SEPARATOR)) //'\\') || (*pfile == '/'))
+        {
+            pfile++;
+            break;
+        }
+    }
+
+    return pfile;
+}
+
+/* gets only the file folder from the given path 
+ * (compatible with unix and win) */
+char* comp_get_filefolder(char* path) {
+    int i;
+    char *folder = strdup(path);
+
+    for (i = strlen(folder); i > 0 ; i--)
+    {
+        if ((folder[i-1] == FILE_SEPARATOR))
+        {
+            folder[i] = '\0';
+            break;
+        }
+    }
+    return folder;
+}
+
+/* return TRUE if the first string 'fullstr' contains one or more occurences of substring 'search'.
+ * (case-insensitive version) */
+gboolean str_contains_cins(char* fullstr, char* search) {
+    return (
+        strstr(
+            g_ascii_strdown(fullstr, strlen(fullstr)), 
+            g_ascii_strdown(search, strlen(search))
+        )!= NULL
+    );
+}
+
+gboolean file_has_extension(char* file, char* ext) {
+    return g_str_has_suffix(
+        g_ascii_strdown(file, strlen(file)), 
+        g_ascii_strdown(ext, strlen(ext))
+    ); 
+}
+
+GimpParamDef pdb_proc_get_param_info(gchar* proc_name, gint arg_num) {
+    GimpParamDef param_info;
+    GimpPDBArgType type;
+    gchar *name;
+    gchar *desc;
+        
+    gimp_procedural_db_proc_arg (
+        proc_name,
+        arg_num,
+        &type,
+        &name,
+        &desc
+    );
+    
+    param_info.type = type;
+    param_info.name = g_strdup(name);
+    param_info.description = g_strdup(desc);
+    
+    return param_info;
+}
+
+char* get_user_dir() {
+    char* path = NULL;
+    
+#ifdef _WIN32
+    path = g_strconcat(getenv("HOMEDRIVE"), getenv("HOMEPATH"), NULL);
+    if (strlen(path) == 0) path = "C:\\";
+#else
+    path = getenv("HOME");
+    if (strlen(path) == 0) path = "/";
+#endif
+    
+    return path;
+}
+
+/* char* get_cgrid_localedir() { */
+/*     int bufsize = 1024; */
+/*     char* path = g_malloc0(bufsize); */
+    
+/*     // different methods for getting the plugin's absolute path, for different systems */
+/* #ifdef __unix__ */
+/*     readlink("/proc/self/exe", path, bufsize); */
+/* #elif defined _WIN32 */
+/*     GetModuleFileName(GetModuleHandle(NULL), path, bufsize); */
+/* #elif defined __APPLE__ */
+/*     _NSGetExecutablePath(path, &bufsize); */
+/* #endif */
+    
+/*     memset(g_strrstr(path, FILE_SEPARATOR_STR), '\0', 1); // truncate at the last path separator (eliminates "cgrid.exe") */
+    
+/*     return g_strconcat(path, FILE_SEPARATOR_STR, "cgrid-locale", NULL); // returns truncated path, plus "/cgrid-locale" directory */
+/* } */
+
+/* C-string case-insensitive comparison function (with gconstpointer args) */ 
+int glib_strcmpi(gconstpointer str1, gconstpointer str2) {
+    return strcasecmp(str1, str2);
+}
+
+gchar** get_path_folders (char *path) {
+    char * normalized_path = (char*)g_malloc(sizeof(path));
+
+    normalized_path = g_strdup(path);
+    return g_strsplit(normalized_path, FILE_SEPARATOR_STR, 0);
+}
+
+/* gets the current date and time in "%Y-%m-%d_%H-%M" format */
+char* get_datetime() {
+    time_t rawtime;
+    struct tm * timeinfo;
+    char* format;
+
+    format = (char*)malloc(sizeof(char)*18);
+    time ( &rawtime );
+    timeinfo = localtime ( &rawtime );
+
+    strftime (format, 18, "%Y-%m-%d_%H-%M", timeinfo);
+
+    return format;
+}
+
+time_t get_modification_time(char* filename) {
+    struct stat filestats;
+    if (stat(filename, &filestats) < 0) {
+        return -1;
+    }
+
+    return filestats.st_mtime;
+}
+
+int set_modification_time(char* filename, time_t mtime) {
+    struct stat filestats;
+    
+    if (stat(filename, &filestats) < 0) {
+        return -1;
+    }
+
+    struct utimbuf new_time;
+    new_time.actime = filestats.st_atime;
+    new_time.modtime = mtime;
+    if (utime(filename, &new_time) < 0) {
+        return -1;
+    }
+    else return 0;
+}
+
+gint compute_n_rows(gint total_elems, gint n_cols) {
+  return CEILING_POS((gfloat)total_elems/n_cols);
+}
+
+
+gboolean   build_image_grid (PlugInVals *vals) {
+  gint32 new_image_display;
+
+  g_printf("Selected %d images.\n", g_slist_length(vals->input_filenames));
+  g_printf("first filename: %s\n", vals->input_filenames->data);
+  g_printf("gutter x: %d\n", vals->gutter_x);
+  g_printf("gutter y: %d\n", vals->gutter_y);
+
+  vals->image_ID = gimp_image_new(MAX((gint)vals->gutter_x, 1), MAX((gint)vals->gutter_y, 1), GIMP_RGB);
+
+  if(vals->image_ID <= 0) {
+    return FALSE;
+  }
+
+  g_slist_foreach(vals->input_filenames, load_input_layer_action, vals);
+  compute_image_size(vals);
+
+  // resize the image to computed size
+  gimp_image_resize(vals->image_ID, vals->output_width, vals->output_height, 0, 0);
+
+  // insert each layer into the image
+  GSList * starting_node = g_slist_last(vals->input_nodes);
+  GSList * rev_list = g_slist_reverse(vals->input_nodes);
+  vals->input_nodes = starting_node;
+  g_slist_foreach(vals->input_nodes, 
+                  place_layer_action, vals);
+    
+  // display the image
+  new_image_display = gimp_display_new(vals->image_ID);
+}
+
+gboolean compute_location(gint position_num, PlugInVals *vals, gint im_width, gint im_height, gint *x_location, gint *y_location) {
+  gint row_num = FLOOR_POS(position_num / vals->n_cols);
+  gint col_num = (position_num) % vals->n_cols;
+
+  gint diff_x = vals->max_input_x - im_width;
+  gint diff_y = vals->max_input_y - im_height;
+
+  g_printf("position: %d, row=%d col=%d \n",position_num, row_num, col_num);
+  
+  *x_location = vals->gutter_x + col_num * vals->col_width + diff_x/2;
+  *y_location = vals->gutter_y + row_num * vals->row_height + diff_y/2;
+}
+
+gboolean place_layer_action(InputNode *node,  PlugInVals *vals) {
+  gint im_width;
+  gint im_height;
+  gint x_location;
+  gint y_location;
+
+  im_width = gimp_drawable_width(node->layer_ID);
+  im_height = gimp_drawable_height(node->layer_ID);
+
+  gimp_image_insert_layer(vals->image_ID, node->layer_ID, 0, -1);
+
+  // compute the x,y position
+  compute_location(node->position_n, vals, im_width, im_height, &x_location, &y_location);
+
+  g_print("placing image %d at (%d, %d)\n", node->position_n, x_location, y_location);
+  
+  // place the layer in its position
+  gimp_layer_set_offsets(node->layer_ID, x_location, y_location);
+
+  // add alpha to the layer, implicit change to RGBA
+  gimp_layer_add_alpha(node->layer_ID);
+  // resize the layer
+  // gimp_layer_resize_to_image_size(node->layer_ID);
+}
+
+gboolean compute_image_size(PlugInVals *vals) {
+  gint n_images;
+
+  gint total_gutter_x;
+  gint total_gutter_y;
+  
+  n_images = g_slist_length(vals->input_filenames);
+  vals->n_rows = compute_n_rows(n_images, vals->n_cols);
+  g_printf("n_rows=%d\n", vals->n_rows);
+  
+  // compute width
+  // width of one column
+  vals->col_width = vals->gutter_x + vals->max_input_x;
+  vals->output_width = vals->gutter_x + (vals->n_cols * vals->col_width);
+
+  // compute height
+  // height of one row
+  vals->row_height = vals->gutter_y + vals->max_input_y;  
+  vals->output_height = vals->gutter_y + (vals->n_rows * vals->row_height);
+
+  return TRUE;  
+}
+
+
+gboolean load_input_layer_action(gchar *input_filename,  PlugInVals *vals) {
+  gint32 layer_ID;
+  gint im_width;
+  gint im_height;
+
+  layer_ID = gimp_file_load_layer(GIMP_RUN_NONINTERACTIVE, vals->image_ID, input_filename);
+  g_printf("new layer id %d loaded into image id %d\n", layer_ID, vals->image_ID); 
+ 
+  im_width = gimp_drawable_width(layer_ID);
+  im_height = gimp_drawable_height(layer_ID);
+
+  vals->max_input_x = MAX(im_width, vals->max_input_x);
+  vals->max_input_y = MAX(im_height, vals->max_input_y);
+
+  // append to layers list
+  InputNode *node = calloc(1, sizeof(InputNode));
+  node->layer_ID = layer_ID;
+  node->position_n = g_slist_length(vals->input_nodes);
+  vals->input_nodes = g_slist_append(vals->input_nodes, node);
+  g_print("%d number of nodes\n", g_slist_length(vals->input_nodes));
+
+  return TRUE;
+}
+
 
 #define SCALE_WIDTH        180
 #define SPIN_BUTTON_WIDTH   75
 #define RANDOM_SEED_WIDTH  100
-
-
-/*  Local function prototypes  */
 
 static gboolean   dialog_image_constraint_func (gint32    image_id,
                                                 gpointer  data);
@@ -138,7 +850,7 @@ gboolean dialog (PlugInVals *vals, PlugInUIVals *ui_vals) {
         gint run = gimp_dialog_run (GIMP_DIALOG(cgrid_window_main));
         if (run == GTK_RESPONSE_OK) {
           if (g_slist_length(cgrid_input_filenames) == 0) {
-            cgrid_show_error_dialog(_("The file list is empty!"), cgrid_window_main);
+            cgrid_show_error_dialog("The file list is empty!", cgrid_window_main);
           }
           else {
             /* Set options */
@@ -215,7 +927,7 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
 
   GtkWidget *table_optns;
 
-  panel = gtk_frame_new(_("Input files and options"));
+  panel = gtk_frame_new("Input files and options");
   gtk_widget_set_size_request (panel, OPTION_PANEL_W, OPTION_PANEL_H);
     
   /* Sub-panel for input file listing and buttons */
@@ -234,11 +946,11 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
   /* Sub-panel for input file buttons */
   hbox_buttons = gtk_hbox_new(FALSE, 1);
   gtk_widget_set_size_request(hbox_buttons, FILE_LIST_BUTTONS_PANEL_W, FILE_LIST_BUTTONS_PANEL_H);
-  lbl_files_info = gtk_label_new(_("Total Files: 0"));
+  lbl_files_info = gtk_label_new("Total Files: 0");
   gtk_widget_set_size_request(lbl_files_info, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
-  button_add = gtk_button_new_with_label(_("Add images"));
+  button_add = gtk_button_new_with_label("Add images");
   gtk_widget_set_size_request(button_add, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
-  button_remove = gtk_button_new_with_label(_("Remove images"));
+  button_remove = gtk_button_new_with_label("Remove images");
   gtk_widget_set_size_request(button_remove, FILE_LIST_BUTTON_W, FILE_LIST_BUTTON_H);
 
   gutters = gimp_coordinates_new(GIMP_UNIT_PIXEL,
@@ -249,14 +961,14 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
                                             GIMP_SIZE_ENTRY_UPDATE_SIZE,
                                             TRUE,
                                             FALSE,
-                                            _("Horizontal spacing"),
+                                            "Horizontal spacing",
                                             0,
                                             300,
                                             0,
                                             2<<16,
                                             0,
                                             2<<16,
-                                            _("Vertical spacing"),
+                                            "Vertical spacing",
                                             0,
                                             300,
                                             0,
@@ -279,8 +991,8 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
                                      SCALE_WIDTH, SPIN_BUTTON_WIDTH,
                                      vals->n_cols, 1, 1, 1, 10, 0,
                                      TRUE, 0, 0,
-                                     _("Cols...tip"), NULL);
-  lbl_n_cols = gtk_label_new(_("Max number of columns:"));
+                                     "Cols...tip", NULL);
+  lbl_n_cols = gtk_label_new("Max number of columns:");
   gtk_misc_set_alignment(lbl_n_cols, 1, 0.3);
   gtk_table_attach_defaults(table_optns, 
                             lbl_n_cols, 
@@ -294,8 +1006,8 @@ static GtkWidget* option_panel_new(PlugInVals *vals) {
 
   hbox_resolution = gtk_hbox_new(FALSE, 1);
   //gtk_widget_set_size_request(hbox_resolution, FILE_LIST_BUTTONS_PANEL_W, FILE_LIST_BUTTONS_PANEL_H);
-  lbl_resolution = gtk_label_new(_("Resolution: "));
-  lbl_resolution_desc = gtk_label_new(_("DPI"));
+  lbl_resolution = gtk_label_new("Resolution: ");
+  lbl_resolution_desc = gtk_label_new("DPI");
   spin_button_resolution = gtk_spin_button_new_with_range(1, 2<<16, 50);
   gtk_spin_button_set_value(spin_button_resolution, 
                             300);
@@ -404,7 +1116,7 @@ static void add_input_folder_r(char* folder, gboolean with_subdirs) {
         g_dir_close (dp);
     }
     else {
-        cgrid_show_error_dialog(g_strdup_printf(_("Couldn't read into \"%s\" directory."), folder), cgrid_window_main);
+        cgrid_show_error_dialog(g_strdup_printf("Couldn't read into \"%s\" directory.", folder), cgrid_window_main);
     }
 }
 
@@ -527,7 +1239,7 @@ void files_list_change_callback() {
     }
     list_len = g_slist_length(cgrid_input_filenames);
     n_files_text = calloc(list_len/10+1, sizeof(char));
-    sprintf(n_files_text, _("Total files: %d"), list_len);
+    sprintf(n_files_text, "Total files: %d", list_len);
     gtk_label_set_text(lbl_files_info, n_files_text);
 
     //adj_n_cols
@@ -580,11 +1292,6 @@ static void update_selection (gchar* filename)
 }
 
 
-
-
-
-
-
 static void open_file_chooser(GtkWidget *widget, gpointer data) 
 {
     GSList *selection;
@@ -592,7 +1299,7 @@ static void open_file_chooser(GtkWidget *widget, gpointer data)
     GtkFileFilter *filter_all, *supported[7];
 
     GtkWidget* file_chooser = gtk_file_chooser_dialog_new(
-        _("Select images"), 
+        "Select images", 
         NULL, 
         GTK_FILE_CHOOSER_ACTION_OPEN, 
         GTK_STOCK_CANCEL, GTK_RESPONSE_CLOSE, 
@@ -601,7 +1308,7 @@ static void open_file_chooser(GtkWidget *widget, gpointer data)
     gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(file_chooser), TRUE);
     
     filter_all = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter_all,_("All supported types"));
+    gtk_file_filter_set_name(filter_all,"All supported types");
     
     supported[0] = gtk_file_filter_new();
     gtk_file_filter_set_name(supported[0], "Bitmap (*.bmp)");
@@ -668,7 +1375,7 @@ static void open_folder_chooser(GtkWidget *widget, gpointer data)
     gboolean include_subdirs;
 
     GtkWidget* folder_chooser = gtk_file_chooser_dialog_new(
-        _("Select folders containing images"), 
+        "Select folders containing images", 
         NULL, 
         GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, 
         GTK_STOCK_CANCEL, GTK_RESPONSE_CLOSE, 
@@ -677,7 +1384,7 @@ static void open_folder_chooser(GtkWidget *widget, gpointer data)
     gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(folder_chooser), TRUE);
 
     /* Add checkbox to select the depth of file search */
-    GtkWidget* with_subdirs = gtk_check_button_new_with_label(_("Add files from the whole hierarchy"));
+    GtkWidget* with_subdirs = gtk_check_button_new_with_label("Add files from the whole hierarchy");
     gtk_widget_show (with_subdirs);
     gtk_file_chooser_set_extra_widget (GTK_FILE_CHOOSER(folder_chooser), GTK_WIDGET(with_subdirs));
     
@@ -709,10 +1416,10 @@ static void popmenus_init() {
     /* menu to add files to the list in various ways */
     popmenu_addfiles = gtk_menu_new();
     
-    menuitem = gtk_menu_item_new_with_label(_("Add single images..."));
+    menuitem = gtk_menu_item_new_with_label("Add single images...");
     g_signal_connect(menuitem, "activate", G_CALLBACK(open_file_chooser), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popmenu_addfiles), menuitem);
-    menuitem = gtk_menu_item_new_with_label(_("Add folders..."));
+    menuitem = gtk_menu_item_new_with_label("Add folders...");
     g_signal_connect(menuitem, "activate", G_CALLBACK(open_folder_chooser), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popmenu_addfiles), menuitem);
     //menuitem = gtk_menu_item_new_with_label(_("Add all opened images"));
@@ -722,10 +1429,10 @@ static void popmenus_init() {
     /* menu to remove files to the list */
     popmenu_removefiles = gtk_menu_new();
     
-    menuitem = gtk_menu_item_new_with_label(_("Remove selected"));
+    menuitem = gtk_menu_item_new_with_label("Remove selected");
     g_signal_connect(menuitem, "activate", G_CALLBACK(remove_input_file), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popmenu_removefiles), menuitem);
-    menuitem = gtk_menu_item_new_with_label(_("Remove all"));
+    menuitem = gtk_menu_item_new_with_label("Remove all");
     g_signal_connect(menuitem, "activate", G_CALLBACK(remove_all_input_files), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popmenu_removefiles), menuitem);
     
@@ -828,3 +1535,4 @@ void cgrid_set_busy(gboolean busy) {
     
     gtk_widget_set_sensitive(panel_options, !busy);
 }
+
