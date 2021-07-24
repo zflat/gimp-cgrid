@@ -276,17 +276,6 @@ static void query (void) {
       { GIMP_PDB_INT32,    "run_mode",   "Interactive, non-interactive"    },
     };
 
-  // gimp_plugin_domain_register (GETTEXT_PACKAGE, LOCALEDIR);
-
-  /* help_path = g_build_filename (DATADIR, "help", NULL); */
-  /* help_uri = g_filename_to_uri (help_path, NULL, NULL); */
-  /* g_free (help_path); */
-
-  /* gimp_plugin_help_register ("http://developer.gimp.org/plug-in-template/help", */
-  /*                            help_uri); */
-
-  /* g_free (help_uri); */
-
   gimp_install_procedure (PROCEDURE_NAME,
                           PLUG_IN_DESCRIPTION,
                           "William Wedler",
@@ -316,13 +305,6 @@ run (const gchar      *name,
 
   *nreturn_vals = 1;
   *return_vals  = values;
-
-  /*  Initialize i18n support  */
-/*   bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR); */
-/* #ifdef HAVE_BIND_TEXTDOMAIN_CODESET */
-/*   bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8"); */
-/* #endif */
-/*   textdomain (GETTEXT_PACKAGE); */
 
   run_mode = param[0].data.d_int32;
 
@@ -536,24 +518,6 @@ char* get_user_dir() {
     return path;
 }
 
-/* char* get_cgrid_localedir() { */
-/*     int bufsize = 1024; */
-/*     char* path = g_malloc0(bufsize); */
-    
-/*     // different methods for getting the plugin's absolute path, for different systems */
-/* #ifdef __unix__ */
-/*     readlink("/proc/self/exe", path, bufsize); */
-/* #elif defined _WIN32 */
-/*     GetModuleFileName(GetModuleHandle(NULL), path, bufsize); */
-/* #elif defined __APPLE__ */
-/*     _NSGetExecutablePath(path, &bufsize); */
-/* #endif */
-    
-/*     memset(g_strrstr(path, FILE_SEPARATOR_STR), '\0', 1); // truncate at the last path separator (eliminates "cgrid.exe") */
-    
-/*     return g_strconcat(path, FILE_SEPARATOR_STR, "cgrid-locale", NULL); // returns truncated path, plus "/cgrid-locale" directory */
-/* } */
-
 /* C-string case-insensitive comparison function (with gconstpointer args) */ 
 int glib_strcmpi(gconstpointer str1, gconstpointer str2) {
     return strcasecmp(str1, str2);
@@ -754,14 +718,6 @@ static void popmenus_init(void);
 static void init_fileview();
 static void add_to_fileview(char *str);
 static void refresh_fileview();
-
-/*static const gchar* progressbar_init_hidden ();
-static void progressbar_start_hidden (const gchar *message, gboolean cancelable, gpointer user_data);
-static void progressbar_end_hidden (gpointer user_data);
-static void progressbar_settext_hidden (const gchar *message, gpointer user_data);
-static void progressbar_setvalue_hidden (double percent, gpointer user_data);
-static void cgrid_progress_bar_set(double fraction, char* text);
-*/
 
 static void cgrid_set_busy(gboolean busy);
 
@@ -1463,36 +1419,6 @@ void cgrid_show_error_dialog(char* message, GtkWidget* parent)
 
 
 
-
-
-/* suppress progress popup by installing progress handlers that do nothing */
-/*
-static const gchar* progressbar_init_hidden ()
-{    
-    GimpProgressVtable vtable = { 0, };
-
-    vtable.start     = progressbar_start_hidden;
-    vtable.end       = progressbar_end_hidden;
-    vtable.set_text  = progressbar_settext_hidden;
-    vtable.set_value = progressbar_setvalue_hidden;
-  
-    return gimp_progress_install_vtable (&vtable, NULL);
-}
-static void progressbar_start_hidden (const gchar *message, gboolean cancelable, gpointer user_data) { }
-static void progressbar_end_hidden (gpointer user_data) { }
-static void progressbar_settext_hidden (const gchar *message, gpointer user_data) { }
-static void progressbar_setvalue_hidden (double percent, gpointer user_data) { }
-
-void cgrid_progress_bar_set(double fraction, char* text) {
-    if (fraction > 1.0) fraction = 1.0;
-    
-    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar_visible), fraction);
-    if (text != NULL) {
-        gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar_visible), text);
-    }
-}
-*/
-
 void cgrid_set_busy(gboolean busy) {
     GList *actions_children, *tmp_child;
     struct _ResponseData { gint response_id; };
@@ -1502,37 +1428,5 @@ void cgrid_set_busy(gboolean busy) {
     gtk_dialog_set_response_sensitive (GTK_DIALOG(cgrid_window_main), GTK_RESPONSE_CLOSE, !busy);
     gtk_dialog_set_response_sensitive (GTK_DIALOG(cgrid_window_main), GTK_RESPONSE_HELP, !busy);
     
-    /* procedure that hides and shows some widgets in the dialog's action area. Compatible with GTK+ 2.16 */
-
-    /*    
-    GtkWidget* actions = gtk_dialog_get_action_area (GTK_DIALOG(cgrid_window_main));
-    actions_children = gtk_container_get_children (GTK_CONTAINER (actions));
-    tmp_child = actions_children;
-    while (tmp_child != NULL)
-    {
-        GtkWidget *widget = tmp_child->data;
-        struct _ResponseData *rd = g_object_get_data (G_OBJECT (widget), "gtk-dialog-response-data");
-
-        if (rd && rd->response_id == GTK_RESPONSE_APPLY) {
-            if (busy) {
-                gtk_widget_hide (widget);
-            } else {
-                gtk_widget_show (widget);
-            }
-        }
-        else if (rd && rd->response_id == GTK_RESPONSE_CANCEL) {
-            if (!busy) {
-                gtk_widget_hide (widget);
-            } else {
-                gtk_widget_show (widget);
-            }
-        }
-
-        tmp_child = g_list_next (tmp_child);
-    }
-    g_list_free (actions_children);
-    */
-    
     gtk_widget_set_sensitive(panel_options, !busy);
 }
-
