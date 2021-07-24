@@ -1,8 +1,0 @@
-*.gmo
-*.mo
-Makefile
-Makefile.in
-POTFILES
-gimp20-plugin-template.pot
-messages
-.intltool-merge-cachemake
